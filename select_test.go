@@ -1,17 +1,20 @@
 package orm
 
 import (
-	"database/sql"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 type TestModel struct {
-	Id       int64
-	LastName *sql.NullString
+	Id        int64
+	LastName  string
+	FirstName string
 }
 
 func TestSelector_Build(t *testing.T) {
+	db, err := NewDB()
+	require.NoError(t, err)
 	testCases := []struct {
 		name      string
 		builder   QueryBuilder
@@ -20,54 +23,54 @@ func TestSelector_Build(t *testing.T) {
 	}{
 		{
 			name:    "test_model",
-			builder: &Selector[TestModel]{},
+			builder: NewSelector[TestModel](db),
 			wantQuery: &Query{
-				SQL: "SELECT * FROM `TestModel`;",
+				SQL: "SELECT * FROM `test_model`;",
 			},
 		},
 		{
 			name:    "from",
-			builder: (&Selector[TestModel]{}).From("test"),
+			builder: NewSelector[TestModel](db).From("test"),
 			wantQuery: &Query{
 				SQL: "SELECT * FROM test;",
 			},
 		},
 		{
 			name:    "from empty",
-			builder: (&Selector[TestModel]{}).From(""),
+			builder: NewSelector[TestModel](db).From(""),
 			wantQuery: &Query{
-				SQL: "SELECT * FROM `TestModel`;",
+				SQL: "SELECT * FROM `test_model`;",
 			},
 		},
 		{
 			name:    "from table with db",
-			builder: (&Selector[TestModel]{}).From("db.test"),
+			builder: NewSelector[TestModel](db).From("db.test"),
 			wantQuery: &Query{
 				SQL: "SELECT * FROM db.test;",
 			},
 		},
 		{
 			name:    "where",
-			builder: (&Selector[TestModel]{}).Where(Col("age").Eq(18)),
+			builder: NewSelector[TestModel](db).Where(Col("Id").Eq(18)),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE `age` = ?;",
+				SQL:  "SELECT * FROM `test_model` WHERE `id` = ?;",
 				Args: []any{18},
 			},
 		},
 		{
 			name:    "not",
-			builder: (&Selector[TestModel]{}).Where(Not(Col("age").Eq(18))),
+			builder: NewSelector[TestModel](db).Where(Not(Col("Id").Eq(18))),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE  NOT (`age` = ?);",
+				SQL:  "SELECT * FROM `test_model` WHERE  NOT (`id` = ?);",
 				Args: []any{18},
 			},
 		},
 		{
 			name:    "or",
-			builder: (&Selector[TestModel]{}).Where(Col("age").Eq(18).Or(Col("age").Eq(20))),
+			builder: NewSelector[TestModel](db).Where(Col("Id").Eq(18).Or(Col("LastName").Eq("hello"))),
 			wantQuery: &Query{
-				SQL:  "SELECT * FROM `TestModel` WHERE (`age` = ?) OR (`age` = ?);",
-				Args: []any{18, 20},
+				SQL:  "SELECT * FROM `test_model` WHERE (`id` = ?) OR (`last_name` = ?);",
+				Args: []any{18, "hello"},
 			},
 		},
 	}
@@ -75,7 +78,7 @@ func TestSelector_Build(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			q, err := tc.builder.Build()
-			assert.Equal(t, tc.wantQuery, q)
+			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return
 			}
@@ -84,6 +87,28 @@ func TestSelector_Build(t *testing.T) {
 	}
 }
 
-func aaa() {
+func TestRotate(t *testing.T) {
+	nums := []int{1, 2, 3, 4, 5, 6, 7}
+	rotate(nums, 3)
+	assert.Equal(t, []int{5, 6, 7, 1, 2, 3, 4}, nums)
+}
 
+func rotate(nums []int, k int) {
+	n := len(nums)
+	offset := k % n
+	if offset == 0 {
+		return
+	}
+
+	reverse(nums, 0, n)
+	reverse(nums, 0, offset)
+	reverse(nums, offset, n)
+
+}
+
+func reverse(nums []int, i, j int) {
+	n := (i + j) / 2
+	for start := i; start < n; start++ {
+		nums[start], nums[j-1-(start-i)] = nums[j-1-(start-i)], nums[start]
+	}
 }
