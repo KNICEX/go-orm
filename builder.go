@@ -2,12 +2,14 @@ package orm
 
 import (
 	"github.com/KNICEX/go-orm/internal/errs"
+	model2 "github.com/KNICEX/go-orm/model"
 	"strings"
 )
 
 type builder struct {
-	args []any
-	sb   strings.Builder
+	args  []any
+	sb    strings.Builder
+	model *model2.Model
 }
 
 func (b *builder) buildPredicate(ps []Predicate) error {
@@ -56,7 +58,11 @@ func (b *builder) buildExpression(expr Expression) error {
 		}
 	case Column:
 		b.sb.WriteByte('`')
-		b.sb.WriteString(exp.name)
+		colName, ok := b.model.FieldMap[exp.name]
+		if !ok {
+			return errs.NewErrUnknownField(exp.name)
+		}
+		b.sb.WriteString(colName.ColName)
 		b.sb.WriteByte('`')
 	case value:
 		b.sb.WriteByte('?')

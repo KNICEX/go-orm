@@ -7,6 +7,10 @@ const (
 	opNot op = "NOT"
 	opAnd op = "AND"
 	opOr  op = "OR"
+	opGt  op = ">"
+	opLt  op = "<"
+	opGe  op = ">="
+	opLe  op = "<="
 )
 
 func (o op) String() string {
@@ -40,6 +44,46 @@ func (c Column) Eq(arg any) Predicate {
 	return Predicate{
 		left: c,
 		op:   opEq,
+		right: value{
+			val: arg,
+		},
+	}
+}
+
+func (c Column) Gt(arg any) Predicate {
+	return Predicate{
+		left: c,
+		op:   opGt,
+		right: value{
+			val: arg,
+		},
+	}
+}
+
+func (c Column) Lt(arg any) Predicate {
+	return Predicate{
+		left: c,
+		op:   opLt,
+		right: value{
+			val: arg,
+		},
+	}
+}
+
+func (c Column) Ge(arg any) Predicate {
+	return Predicate{
+		left: c,
+		op:   opGe,
+		right: value{
+			val: arg,
+		},
+	}
+}
+
+func (c Column) Le(arg any) Predicate {
+	return Predicate{
+		left: c,
+		op:   opLe,
 		right: value{
 			val: arg,
 		},

@@ -1,4 +1,4 @@
-package orm
+package model
 
 import (
 	"github.com/KNICEX/go-orm/internal/errs"
@@ -8,32 +8,24 @@ import (
 	"unicode"
 )
 
-const (
-	tagColumn = "column"
-)
-
-type model struct {
-	tableName string
-	fields    map[string]*field
-}
-
-type field struct {
-	colName string
+func NewRegistry() Registry {
+	return &registry{
+		models: make(map[reflect.Type]*Model),
+	}
 }
 
 type registry struct {
 	lock   sync.RWMutex
-	models map[reflect.Type]*model
+	models map[reflect.Type]*Model
 }
 
-// 只接收结构体一级指针
-func (r *registry) get(val any) (*model, error) {
+// Get 只接收结构体一级指针
+func (r *registry) Get(val any) (*Model, error) {
 	typ := reflect.TypeOf(val)
 
 	r.lock.RLock()
 	m, ok := r.models[typ]
 	r.lock.RUnlock()
-
 	if ok {
 		return m, nil
 	}
@@ -48,16 +40,15 @@ func (r *registry) get(val any) (*model, error) {
 	}
 
 	var err error
-	m, err = r.parseModel(val)
+	m, err = r.Register(val)
 	if err != nil {
 		return nil, err
 	}
-	r.models[typ] = m
 	return m, nil
 }
 
-// parseModel struct 一级指针
-func (r *registry) parseModel(entity any) (*model, error) {
+// Register 只接受 struct 一级指针
+func (r *registry) Register(entity any, opts ...Option) (*Model, error) {
 	typ := reflect.TypeOf(entity)
 	if typ.Kind() != reflect.Pointer {
 		return nil, errs.ErrModelType
@@ -68,7 +59,8 @@ func (r *registry) parseModel(entity any) (*model, error) {
 	}
 
 	numField := typ.NumField()
-	fieldMap := make(map[string]*field)
+	fieldMap := make(map[string]*Field)
+	colMap := make(map[string]*Field)
 	for i := 0; i < numField; i++ {
 		fd := typ.Field(i)
 		if fd.IsExported() {
@@ -82,9 +74,14 @@ func (r *registry) parseModel(entity any) (*model, error) {
 				colName = underscoreName(fd.Name)
 			}
 
-			fieldMap[fd.Name] = &field{
-				colName: colName,
+			fieldInfo := &Field{
+				ColName: colName,
+				Typ:     fd.Type,
+				GoName:  fd.Name,
+				Offset:  fd.Offset,
 			}
+			fieldMap[fd.Name] = fieldInfo
+			colMap[colName] = fieldInfo
 		}
 	}
 
@@ -95,14 +92,18 @@ func (r *registry) parseModel(entity any) (*model, error) {
 		tableName = underscoreName(typ.Name())
 	}
 
-	return &model{
-		tableName: tableName,
-		fields:    fieldMap,
-	}, nil
-}
-
-type User struct {
-	ID int `geeorm:"column=id"`
+	res := &Model{
+		TableName: tableName,
+		FieldMap:  fieldMap,
+		ColMap:    colMap,
+	}
+	for _, opt := range opts {
+		if err := opt(res); err != nil {
+			return nil, err
+		}
+	}
+	r.models[typ] = res
+	return res, nil
 }
 
 func (r *registry) parseTag(tag reflect.StructTag) (map[string]string, error) {

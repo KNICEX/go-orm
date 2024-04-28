@@ -3,6 +3,7 @@ package orm
 import (
 	"context"
 	"database/sql"
+	"github.com/KNICEX/go-orm/model"
 )
 
 type Deleter[T any] struct {
@@ -11,12 +12,12 @@ type Deleter[T any] struct {
 
 	builder
 
-	model *model
-	r     *registry
+	model *model.Model
+	r     model.Registry
 }
 
 func (d *Deleter[T]) Build() (*Query, error) {
-	m, err := d.r.get(new(T))
+	m, err := d.r.Get(new(T))
 	if err != nil {
 		return nil, err
 	}
@@ -27,7 +28,7 @@ func (d *Deleter[T]) Build() (*Query, error) {
 	// 表名 如果没有指定表名，则使用类型名
 	if d.table == "" {
 		sb.WriteByte('`')
-		sb.WriteString(m.tableName)
+		sb.WriteString(m.TableName)
 		sb.WriteByte('`')
 	} else {
 		// 自己指定表名，不会自动加反引号， 因为可能是 db.table 这种形式

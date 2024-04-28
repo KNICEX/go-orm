@@ -7,6 +7,7 @@ import (
 
 var (
 	ErrModelType = errors.New("orm: only support struct pointer")
+	ErrNoRows    = errors.New("orm: no rows")
 )
 
 func NewErrUnsupportedExpression(expr any) error {
@@ -19,4 +20,8 @@ func NewErrUnknownField(name string) error {
 
 func NewErrInvalidTag(tag string) error {
 	return fmt.Errorf("orm: invalid tag %s", tag)
+}
+
+func NewErrUnknownColumn(name string) error {
+	return fmt.Errorf("orm: unknown column %s", name)
 }
