@@ -15,6 +15,8 @@ type unsafeValue struct {
 
 var _ Creator = NewUnsafeValue
 
+// NewUnsafeValue
+// val 是结构体一级指针或者切片一级指针
 func NewUnsafeValue(model *model.Model, val any) Value {
 	return &unsafeValue{
 		model: model,
@@ -28,11 +30,33 @@ func (u *unsafeValue) SetColumns(rows *sql.Rows) error {
 		return err
 	}
 
-	vals := make([]any, 0, len(cs))
+	tpValue := reflect.ValueOf(u.val).Elem()
+	if tpValue.Kind() == reflect.Slice {
+		// 切片元素一定是结构体一级指针
+		entityType := tpValue.Type().Elem()
+		entity := reflect.New(entityType.Elem()).Interface()
+		// 调用该方法前会调用rows.Next()，所以这里第一行不需要再调用
+		if err = u.setRow(cs, rows, entity); err != nil {
+			return err
+		}
+		tpValue.Set(reflect.Append(tpValue, reflect.ValueOf(entity)))
+		for rows.Next() {
+			entity = reflect.New(entityType.Elem()).Interface()
+			if err = u.setRow(cs, rows, entity); err != nil {
+				return err
+			}
+			tpValue.Set(reflect.Append(tpValue, reflect.ValueOf(entity)))
+		}
+		return nil
+	} else {
+		return u.setRow(cs, rows, u.val)
+	}
+}
 
-	// 起始地址
-	addr := reflect.ValueOf(u.val).UnsafePointer()
-	for _, c := range cs {
+func (u *unsafeValue) setRow(row []string, scanner *sql.Rows, entity any) error {
+	vals := make([]any, 0, len(row))
+	addr := reflect.ValueOf(entity).UnsafePointer()
+	for _, c := range row {
 		fd, ok := u.model.ColMap[c]
 		if !ok {
 			return errs.NewErrUnknownColumn(c)
@@ -43,5 +67,5 @@ func (u *unsafeValue) SetColumns(rows *sql.Rows) error {
 		val := reflect.NewAt(fd.Typ, fdAddr).Interface()
 		vals = append(vals, val)
 	}
-	return rows.Scan(vals...)
+	return scanner.Scan(vals...)
 }

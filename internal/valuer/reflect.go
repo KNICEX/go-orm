@@ -14,7 +14,10 @@ type reflectValue struct {
 
 var _ Creator = NewReflectValue
 
+// NewReflectValue
+// val 结构体一级指针或slice一级指针
 func NewReflectValue(model *model.Model, val any) Value {
+
 	return &reflectValue{
 		model: model,
 		val:   val,
@@ -26,10 +29,36 @@ func (r *reflectValue) SetColumns(rows *sql.Rows) error {
 	if err != nil {
 		return err
 	}
+	tpValue := reflect.ValueOf(r.val).Elem()
 
-	vals := make([]any, 0, len(cs))
-	valElems := make([]reflect.Value, 0, len(cs))
-	for _, c := range cs {
+	if tpValue.Kind() == reflect.Slice {
+		// 切片元素一定是结构体一级指针
+		entityType := tpValue.Type().Elem()
+		entity := reflect.New(entityType.Elem()).Interface()
+		// 调用该方法前会调用rows.Next()，所以这里第一行不需要再调用
+		if err = r.setRow(cs, rows, entity); err != nil {
+			return err
+		}
+		tpValue.Set(reflect.Append(tpValue, reflect.ValueOf(entity)))
+		for rows.Next() {
+			entity = reflect.New(entityType.Elem()).Interface()
+			if err = r.setRow(cs, rows, entity); err != nil {
+				return err
+			}
+			tpValue.Set(reflect.Append(tpValue, reflect.ValueOf(entity)))
+		}
+		return nil
+	} else {
+		return r.setRow(cs, rows, r.val)
+	}
+}
+
+// row 数据库行字段
+// entity 结构体一级指针
+func (r *reflectValue) setRow(row []string, scanner *sql.Rows, entity any) error {
+	vals := make([]any, 0, len(row))
+	valElems := make([]reflect.Value, 0, len(row))
+	for _, c := range row {
 		fd, ok := r.model.ColMap[c]
 		if !ok {
 			return errs.NewErrUnknownColumn(c)
@@ -40,13 +69,13 @@ func (r *reflectValue) SetColumns(rows *sql.Rows) error {
 		valElems = append(valElems, val.Elem())
 	}
 
-	err = rows.Scan(vals...)
+	err := scanner.Scan(vals...)
 	if err != nil {
 		return err
 	}
-	tpValue := reflect.ValueOf(r.val).Elem()
-	for i, c := range cs {
-		// 这里不用检查是否存在，因为上面已经检查过了
+
+	tpValue := reflect.ValueOf(entity).Elem()
+	for i, c := range row {
 		fd, _ := r.model.ColMap[c]
 		tpValue.FieldByName(fd.GoName).Set(valElems[i])
 	}

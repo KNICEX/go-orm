@@ -8,6 +8,7 @@ import (
 	"testing"
 )
 
+// go test -bench=BenchmarkSetColumns -benchmem -benchtime=10000x
 func BenchmarkSetColumns(b *testing.B) {
 
 	fn := func(b *testing.B, creator Creator) {

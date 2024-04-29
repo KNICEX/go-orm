@@ -31,6 +31,28 @@ func TestUnsafeValue_SetColumns(t *testing.T) {
 				FirstName: "John",
 			},
 		},
+		{
+			name:   "slice",
+			entity: &[]*TestModel{},
+			rows: func() *sqlmock.Rows {
+				rows := sqlmock.NewRows([]string{"id", "last_name", "first_name"}).
+					AddRow(1, "Smith", "John").
+					AddRow(2, "Doe", "Jane")
+				return rows
+			},
+			wantEntity: &[]*TestModel{
+				{
+					Id:        1,
+					LastName:  "Smith",
+					FirstName: "John",
+				},
+				{
+					Id:        2,
+					LastName:  "Doe",
+					FirstName: "Jane",
+				},
+			},
+		},
 	}
 
 	r := model.NewRegistry()
@@ -38,7 +60,7 @@ func TestUnsafeValue_SetColumns(t *testing.T) {
 	require.NoError(t, err)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			model, err := r.Get(tc.entity)
+			model, err := r.Get(&TestModel{})
 			require.NoError(t, err)
 			val := NewUnsafeValue(model, tc.entity)
 

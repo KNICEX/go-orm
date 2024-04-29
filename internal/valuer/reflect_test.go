@@ -31,6 +31,33 @@ func TestReflectValue_SetColumns(t *testing.T) {
 					AddRow(1, "Smith", "John")
 				return rows
 			},
+			wantEntity: &TestModel{
+				Id:        1,
+				LastName:  "Smith",
+				FirstName: "John",
+			},
+		},
+		{
+			name:   "slice",
+			entity: &[]*TestModel{},
+			rows: func() *sqlmock.Rows {
+				rows := sqlmock.NewRows([]string{"id", "last_name", "first_name"}).
+					AddRow(1, "Smith", "John").
+					AddRow(2, "Doe", "Jane")
+				return rows
+			},
+			wantEntity: &[]*TestModel{
+				{
+					Id:        1,
+					LastName:  "Smith",
+					FirstName: "John",
+				},
+				{
+					Id:        2,
+					LastName:  "Doe",
+					FirstName: "Jane",
+				},
+			},
 		},
 	}
 
@@ -39,7 +66,7 @@ func TestReflectValue_SetColumns(t *testing.T) {
 	require.NoError(t, err)
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			model, err := r.Get(tc.entity)
+			model, err := r.Get(&TestModel{})
 			require.NoError(t, err)
 			val := NewReflectValue(model, tc.entity)
 
@@ -55,6 +82,7 @@ func TestReflectValue_SetColumns(t *testing.T) {
 			if err != nil {
 				return
 			}
+			assert.EqualValues(t, tc.wantEntity, tc.entity)
 
 		})
 	}
