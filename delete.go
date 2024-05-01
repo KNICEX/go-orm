@@ -3,7 +3,6 @@ package orm
 import (
 	"context"
 	"database/sql"
-	"github.com/KNICEX/go-orm/model"
 )
 
 type Deleter[T any] struct {
@@ -12,32 +11,38 @@ type Deleter[T any] struct {
 
 	builder
 
-	model *model.Model
-	r     model.Registry
+	db *DB
+}
+
+func NewDeleter[T any](db *DB) *Deleter[T] {
+	return &Deleter[T]{
+		db: db,
+		builder: builder{
+			dialect: db.dialect,
+			quoter:  db.dialect.quoter(),
+		},
+	}
 }
 
 func (d *Deleter[T]) Build() (*Query, error) {
-	m, err := d.r.Get(new(T))
+	m, err := d.db.r.Get(new(T))
 	if err != nil {
 		return nil, err
 	}
 	d.model = m
-	sb := &d.sb
-	sb.WriteString("DELETE FROM ")
 
+	d.sb.WriteString("DELETE FROM ")
 	// 表名 如果没有指定表名，则使用类型名
 	if d.table == "" {
-		sb.WriteByte('`')
-		sb.WriteString(m.TableName)
-		sb.WriteByte('`')
+		d.quote(m.TableName)
 	} else {
 		// 自己指定表名，不会自动加反引号， 因为可能是 db.table 这种形式
-		sb.WriteString(d.table)
+		d.sb.WriteString(d.table)
 	}
 
 	// 条件构造
 	if len(d.where) > 0 {
-		sb.WriteString(" WHERE ")
+		d.sb.WriteString(" WHERE ")
 
 		if err := d.buildPredicate(d.where); err != nil {
 			return nil, err
@@ -45,9 +50,9 @@ func (d *Deleter[T]) Build() (*Query, error) {
 
 	}
 
-	sb.WriteByte(';')
+	d.sb.WriteByte(';')
 	return &Query{
-		SQL:  sb.String(),
+		SQL:  d.sb.String(),
 		Args: d.args,
 	}, nil
 }
@@ -63,5 +68,9 @@ func (d *Deleter[T]) Where(p Predicate) *Deleter[T] {
 }
 
 func (d *Deleter[T]) Exec(ctx context.Context) (sql.Result, error) {
-	panic("implement me")
+	q, err := d.Build()
+	if err != nil {
+		return nil, err
+	}
+	return d.db.db.ExecContext(ctx, q.SQL, q.Args...)
 }

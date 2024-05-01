@@ -12,6 +12,7 @@ type DB struct {
 	r       model.Registry
 	db      *sql.DB
 	creator valuer.Creator
+	dialect Dialect
 }
 
 func Open(driver, dsn string, ops ...DBOption) (*DB, error) {
@@ -31,9 +32,10 @@ func OpenDB(db *sql.DB, opts ...DBOption) (*DB, error) {
 		r:       model.NewRegistry(),
 		db:      db,
 		creator: valuer.NewUnsafeValue,
+		dialect: &standardSQL{},
 	}
-	for _, op := range opts {
-		op(res)
+	for _, opt := range opts {
+		opt(res)
 	}
 	return res, nil
 }
@@ -41,6 +43,18 @@ func OpenDB(db *sql.DB, opts ...DBOption) (*DB, error) {
 func DBUseReflect() DBOption {
 	return func(db *DB) {
 		db.creator = valuer.NewReflectValue
+	}
+}
+
+func DBWithRegistry(r model.Registry) DBOption {
+	return func(db *DB) {
+		db.r = r
+	}
+}
+
+func DBWithDialect(d Dialect) DBOption {
+	return func(db *DB) {
+		db.dialect = d
 	}
 }
 

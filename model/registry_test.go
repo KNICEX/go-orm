@@ -18,7 +18,7 @@ func TestRegistry_Get(t *testing.T) {
 		name      string
 		entity    any
 		wantModel *Model
-		fields    map[string]*Field
+		fields    []*Field
 		wantErr   error
 	}{
 		{
@@ -38,20 +38,20 @@ func TestRegistry_Get(t *testing.T) {
 			wantModel: &Model{
 				TableName: "test_model",
 			},
-			fields: map[string]*Field{
-				"Id": {
+			fields: []*Field{
+				{
 					ColName: "id",
 					GoName:  "Id",
 					Typ:     reflect.TypeOf(int64(0)),
 					Offset:  0,
 				},
-				"FirstName": {
+				{
 					ColName: "first_name",
 					GoName:  "FirstName",
 					Typ:     reflect.TypeOf(""),
 					Offset:  8,
 				},
-				"LastName": {
+				{
 					ColName: "last_name",
 					GoName:  "LastName",
 					Typ:     reflect.TypeOf(""),
@@ -70,20 +70,20 @@ func TestRegistry_Get(t *testing.T) {
 			wantModel: &Model{
 				TableName: "test_model_with_tag",
 			},
-			fields: map[string]*Field{
-				"Id": {
+			fields: []*Field{
+				{
 					ColName: "id",
 					GoName:  "Id",
 					Typ:     reflect.TypeOf(int64(0)),
 					Offset:  0,
 				},
-				"FirstName": {
+				{
 					ColName: "first_name_t",
 					GoName:  "FirstName",
 					Typ:     reflect.TypeOf(""),
 					Offset:  8,
 				},
-				"LastName": {
+				{
 					ColName: "last_name_t",
 					GoName:  "LastName",
 					Typ:     reflect.TypeOf(""),
@@ -97,7 +97,7 @@ func TestRegistry_Get(t *testing.T) {
 			wantModel: &Model{
 				TableName: "custom_table_name",
 			},
-			fields: map[string]*Field{},
+			fields: []*Field{},
 		},
 		{
 			name:   "custom table name pointer implement",
@@ -105,7 +105,7 @@ func TestRegistry_Get(t *testing.T) {
 			wantModel: &Model{
 				TableName: "custom_table_name_pointer",
 			},
-			fields: map[string]*Field{},
+			fields: []*Field{},
 		},
 	}
 
@@ -125,6 +125,7 @@ func TestRegistry_Get(t *testing.T) {
 				fieldMap[f.GoName] = f
 				colMap[f.ColName] = f
 			}
+			tc.wantModel.Fields = tc.fields
 			tc.wantModel.FieldMap = fieldMap
 			tc.wantModel.ColMap = colMap
 			assert.EqualValues(t, tc.wantModel, m)
@@ -157,7 +158,7 @@ func TestRegistry_Register(t *testing.T) {
 		name      string
 		entity    any
 		opts      []Option
-		fields    map[string]*Field
+		fields    []*Field
 		wantModel *Model
 		wantErr   error
 	}{
@@ -167,20 +168,20 @@ func TestRegistry_Register(t *testing.T) {
 			wantModel: &Model{
 				TableName: "test_model",
 			},
-			fields: map[string]*Field{
-				"Id": {
+			fields: []*Field{
+				{
 					ColName: "id",
 					GoName:  "Id",
 					Typ:     reflect.TypeOf(int64(0)),
 					Offset:  0,
 				},
-				"FirstName": {
+				{
 					ColName: "first_name",
 					GoName:  "FirstName",
 					Typ:     reflect.TypeOf(""),
 					Offset:  8,
 				},
-				"LastName": {
+				{
 					ColName: "last_name",
 					GoName:  "LastName",
 					Typ:     reflect.TypeOf(""),
@@ -197,20 +198,20 @@ func TestRegistry_Register(t *testing.T) {
 			wantModel: &Model{
 				TableName: "test",
 			},
-			fields: map[string]*Field{
-				"Id": {
+			fields: []*Field{
+				{
 					ColName: "id",
 					GoName:  "Id",
 					Typ:     reflect.TypeOf(int64(0)),
 					Offset:  0,
 				},
-				"FirstName": {
+				{
 					ColName: "first_name",
 					GoName:  "FirstName",
 					Typ:     reflect.TypeOf(""),
 					Offset:  8,
 				},
-				"LastName": {
+				{
 					ColName: "last_name",
 					GoName:  "LastName",
 					Typ:     reflect.TypeOf(""),
@@ -228,20 +229,20 @@ func TestRegistry_Register(t *testing.T) {
 			wantModel: &Model{
 				TableName: "test_model",
 			},
-			fields: map[string]*Field{
-				"Id": {
+			fields: []*Field{
+				{
 					ColName: "id",
 					GoName:  "Id",
 					Typ:     reflect.TypeOf(int64(0)),
 					Offset:  0,
 				},
-				"FirstName": {
+				{
 					ColName: "first_name_t",
 					GoName:  "FirstName",
 					Typ:     reflect.TypeOf(""),
 					Offset:  8,
 				},
-				"LastName": {
+				{
 					ColName: "last_name_t",
 					GoName:  "LastName",
 					Typ:     reflect.TypeOf(""),
@@ -275,6 +276,7 @@ func TestRegistry_Register(t *testing.T) {
 				fieldMap[f.GoName] = f
 				colMap[f.ColName] = f
 			}
+			tc.wantModel.Fields = tc.fields
 			tc.wantModel.FieldMap = fieldMap
 			tc.wantModel.ColMap = colMap
 			assert.EqualValues(t, tc.wantModel, m)

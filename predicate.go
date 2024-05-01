@@ -17,11 +17,7 @@ func (o op) String() string {
 	return string(o)
 }
 
-// Expression 标记接口，用于表示一个表达式
-type Expression interface {
-	expr()
-}
-
+// Predicate 谓词，用于构造WHERE条件, 例如 Col("id").Eq(1)
 type Predicate struct {
 	left  Expression
 	op    op
@@ -29,66 +25,6 @@ type Predicate struct {
 }
 
 func (p Predicate) expr() {}
-
-type Column struct {
-	name string
-}
-
-func (c Column) expr() {}
-
-func Col(name string) Column {
-	return Column{name: name}
-}
-
-func (c Column) Eq(arg any) Predicate {
-	return Predicate{
-		left: c,
-		op:   opEq,
-		right: value{
-			val: arg,
-		},
-	}
-}
-
-func (c Column) Gt(arg any) Predicate {
-	return Predicate{
-		left: c,
-		op:   opGt,
-		right: value{
-			val: arg,
-		},
-	}
-}
-
-func (c Column) Lt(arg any) Predicate {
-	return Predicate{
-		left: c,
-		op:   opLt,
-		right: value{
-			val: arg,
-		},
-	}
-}
-
-func (c Column) Ge(arg any) Predicate {
-	return Predicate{
-		left: c,
-		op:   opGe,
-		right: value{
-			val: arg,
-		},
-	}
-}
-
-func (c Column) Le(arg any) Predicate {
-	return Predicate{
-		left: c,
-		op:   opLe,
-		right: value{
-			val: arg,
-		},
-	}
-}
 
 func Not(p Predicate) Predicate {
 	return Predicate{

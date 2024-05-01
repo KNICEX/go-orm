@@ -6,8 +6,9 @@ import (
 )
 
 var (
-	ErrModelType = errors.New("orm: only support struct pointer")
-	ErrNoRows    = errors.New("orm: no rows")
+	ErrModelType     = errors.New("orm: only support struct pointer")
+	ErrNoRows        = errors.New("orm: no rows")
+	ErrInsertZeroRow = errors.New("orm: insert zero row")
 )
 
 func NewErrUnsupportedExpression(expr any) error {
@@ -24,4 +25,8 @@ func NewErrInvalidTag(tag string) error {
 
 func NewErrUnknownColumn(name string) error {
 	return fmt.Errorf("orm: unknown column %s", name)
+}
+
+func NewErrUnsupportedAssignable(assign any) error {
+	return fmt.Errorf("orm: unsupported assignable type %v", assign)
 }

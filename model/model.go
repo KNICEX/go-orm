@@ -9,17 +9,13 @@ const (
 	tagColumn = "column"
 )
 
-type Registry interface {
-	Get(val any) (*Model, error)
-	Register(val any, opts ...Option) (*Model, error)
-}
-
 type Model struct {
 	TableName string
 	// 字段名 -> 字段信息
 	FieldMap map[string]*Field
 	// 列名 -> 字段信息
 	ColMap map[string]*Field
+	Fields []*Field
 }
 
 type Option func(*Model) error

@@ -8,6 +8,11 @@ import (
 	"unicode"
 )
 
+type Registry interface {
+	Get(val any) (*Model, error)
+	Register(val any, opts ...Option) (*Model, error)
+}
+
 func NewRegistry() Registry {
 	return &registry{
 		models: make(map[reflect.Type]*Model),
@@ -61,6 +66,7 @@ func (r *registry) Register(entity any, opts ...Option) (*Model, error) {
 	numField := typ.NumField()
 	fieldMap := make(map[string]*Field)
 	colMap := make(map[string]*Field)
+	fields := make([]*Field, 0, numField)
 	for i := 0; i < numField; i++ {
 		fd := typ.Field(i)
 		if fd.IsExported() {
@@ -82,6 +88,7 @@ func (r *registry) Register(entity any, opts ...Option) (*Model, error) {
 			}
 			fieldMap[fd.Name] = fieldInfo
 			colMap[colName] = fieldInfo
+			fields = append(fields, fieldInfo)
 		}
 	}
 
@@ -96,6 +103,7 @@ func (r *registry) Register(entity any, opts ...Option) (*Model, error) {
 		TableName: tableName,
 		FieldMap:  fieldMap,
 		ColMap:    colMap,
+		Fields:    fields,
 	}
 	for _, opt := range opts {
 		if err := opt(res); err != nil {

@@ -77,6 +77,31 @@ func TestSelector_Build(t *testing.T) {
 				Args: []any{18, "hello"},
 			},
 		},
+		{
+			name:    "raw where",
+			builder: NewSelector[TestModel](db).Where(Raw("id = ? AND first_name = ?", 18, "tom").AsPredicate()),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `test_model` WHERE (id = ? AND first_name = ?);",
+				Args: []any{18, "tom"},
+			},
+		},
+		{
+			name:    "raw in predicate",
+			builder: NewSelector[TestModel](db).Where(Col("Id").Eq(Raw("age + ?", 1))),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `test_model` WHERE `id` = (age + ?);",
+				Args: []any{1},
+			},
+		},
+		{
+			// 条件表达式中别名会被忽略
+			name:    "alias in predicate",
+			builder: NewSelector[TestModel](db).Where(Col("Id").As("user_id").Eq(18)),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `test_model` WHERE `id` = ?;",
+				Args: []any{18},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -170,12 +195,128 @@ func TestSelector_Get(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			res, err := tc.s.GetV1(context.Background())
+			res, err := tc.s.Get(context.Background())
 			assert.Equal(t, tc.wantErr, err)
 			if err != nil {
 				return
 			}
 			assert.Equal(t, tc.wantRes, res)
+		})
+	}
+}
+
+func TestSelector_GetMulti(t *testing.T) {
+	mockDB, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	db, err := OpenDB(mockDB)
+	require.NoError(t, err)
+
+	testCases := []struct {
+		name    string
+		s       *Selector[TestModel]
+		rows    *sqlmock.Rows
+		wantErr error
+		wantRes []*TestModel
+	}{
+		{
+			name: "success",
+			s:    NewSelector[TestModel](db),
+			rows: sqlmock.NewRows([]string{"id", "first_name", "last_name"}).
+				AddRow(1, "tom", "cat").
+				AddRow(2, "jerry", "mouse"),
+			wantRes: []*TestModel{
+				{
+					Id:        1,
+					FirstName: "tom",
+					LastName:  "cat",
+				},
+				{
+					Id:        2,
+					FirstName: "jerry",
+					LastName:  "mouse",
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mock.ExpectQuery("SELECT .*").WillReturnRows(tc.rows)
+			res, err := tc.s.GetMulti(context.Background())
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantRes, res)
+		})
+	}
+}
+
+func TestSelector_Select(t *testing.T) {
+	db, err := OpenDB(nil)
+	require.NoError(t, err)
+	testCases := []struct {
+		name      string
+		s         QueryBuilder
+		wantQuery *Query
+		wantErr   error
+	}{
+		{
+			name: "multiple columns",
+			s:    NewSelector[TestModel](db).Select(Col("Id"), Col("FirstName")),
+			wantQuery: &Query{
+				SQL: "SELECT `id`,`first_name` FROM `test_model`;",
+			},
+		},
+		{
+			name: "columns with alias",
+			s:    NewSelector[TestModel](db).Select(Col("Id").As("user_id"), Col("FirstName").As("name")),
+			wantQuery: &Query{
+				SQL: "SELECT `id` AS `user_id`,`first_name` AS `name` FROM `test_model`;",
+			},
+		},
+		{
+			name:    "error column name",
+			s:       NewSelector[TestModel](db).Select(Col("xx")),
+			wantErr: errs.NewErrUnknownField("xx"),
+		},
+		{
+			name: "aggregate AVG, COUNT",
+			s:    NewSelector[TestModel](db).Select(Avg("Id"), Count("FirstName")),
+			wantQuery: &Query{
+				SQL: "SELECT AVG(`id`),COUNT(`first_name`) FROM `test_model`;",
+			},
+		},
+		{
+			name: "aggregate with alias",
+			s:    NewSelector[TestModel](db).Select(Avg("Id").As("avg_id"), Count("FirstName").As("count_name")),
+			wantQuery: &Query{
+				SQL: "SELECT AVG(`id`) AS `avg_id`,COUNT(`first_name`) AS `count_name` FROM `test_model`;",
+			},
+		},
+		{
+			name:    "invalid  Min column",
+			s:       NewSelector[TestModel](db).Select(Min("xx")),
+			wantErr: errs.NewErrUnknownField("xx"),
+		},
+
+		{
+			name: "raw expression",
+			s:    NewSelector[TestModel](db).Select(Raw("COUNT(DISTINCT first_name)")),
+			wantQuery: &Query{
+				SQL: "SELECT COUNT(DISTINCT first_name) FROM `test_model`;",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := tc.s.Build()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantQuery, q)
 		})
 	}
 }
