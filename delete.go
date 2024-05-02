@@ -8,25 +8,25 @@ type Deleter[T any] struct {
 	table string
 	where []Predicate
 
+	sess Session
 	builder
-
-	db *DB
 }
 
 var _ Executor = (*Deleter[any])(nil)
 
-func NewDeleter[T any](db *DB) *Deleter[T] {
+func NewDeleter[T any](sess Session) *Deleter[T] {
+	c := sess.getCore()
 	return &Deleter[T]{
-		db: db,
+		sess: sess,
 		builder: builder{
-			dialect: db.dialect,
-			quoter:  db.dialect.quoter(),
+			core:   c,
+			quoter: c.dialect.quoter(),
 		},
 	}
 }
 
 func (d *Deleter[T]) Build() (*Query, error) {
-	m, err := d.db.r.Get(new(T))
+	m, err := d.r.Get(new(T))
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +75,7 @@ func (d *Deleter[T]) Exec(ctx context.Context) Result {
 			err: err,
 		}
 	}
-	res, err := d.db.db.ExecContext(ctx, q.SQL, q.Args...)
+	res, err := d.sess.execContext(ctx, q.SQL, q.Args...)
 	return Result{
 		res: res,
 		err: err,

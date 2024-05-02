@@ -15,21 +15,22 @@ type Updater[T any] struct {
 	where []Predicate
 
 	builder
-	db *DB
+	sess Session
 }
 
-func NewUpdater[T any](db *DB) *Updater[T] {
+func NewUpdater[T any](sess Session) *Updater[T] {
+	c := sess.getCore()
 	return &Updater[T]{
-		db: db,
+		sess: sess,
 		builder: builder{
-			dialect: db.dialect,
-			quoter:  db.dialect.quoter(),
+			core:   c,
+			quoter: c.dialect.quoter(),
 		},
 	}
 }
 
 func (u *Updater[T]) Build() (*Query, error) {
-	m, err := u.db.r.Get(new(T))
+	m, err := u.r.Get(new(T))
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +101,7 @@ func (u *Updater[T]) Exec(ctx context.Context) Result {
 			err: err,
 		}
 	}
-	res, err := u.db.db.ExecContext(ctx, q.SQL, q.Args...)
+	res, err := u.sess.execContext(ctx, q.SQL, q.Args...)
 	return Result{
 		res: res,
 		err: err,

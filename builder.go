@@ -2,17 +2,15 @@ package orm
 
 import (
 	"github.com/KNICEX/go-orm/internal/errs"
-	"github.com/KNICEX/go-orm/model"
 	"strings"
 )
 
 type builder struct {
-	args  []any
-	sb    strings.Builder
-	model *model.Model
+	core
+	args []any
+	sb   strings.Builder
 
-	dialect Dialect
-	quoter  byte
+	quoter byte
 }
 
 func (b *builder) quote(name string) {

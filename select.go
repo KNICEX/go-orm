@@ -29,21 +29,22 @@ type Selector[T any] struct {
 	limit    int
 
 	builder
-	db *DB
+	sess Session
 }
 
-func NewSelector[T any](db *DB) *Selector[T] {
+func NewSelector[T any](sess Session) *Selector[T] {
+	c := sess.getCore()
 	return &Selector[T]{
-		db: db,
+		sess: sess,
 		builder: builder{
-			dialect: db.dialect,
-			quoter:  db.dialect.quoter(),
+			core:   c,
+			quoter: c.dialect.quoter(),
 		},
 	}
 }
 
 func (s *Selector[T]) Build() (*Query, error) {
-	m, err := s.db.r.Register(new(T))
+	m, err := s.r.Register(new(T))
 	if err != nil {
 		return nil, err
 	}
@@ -158,8 +159,7 @@ func (s *Selector[T]) beforeQuery(ctx context.Context) (*sql.Rows, error) {
 	if err != nil {
 		return nil, err
 	}
-	db := s.db.db
-	row, err := db.QueryContext(ctx, q.SQL, q.Args...)
+	row, err := s.sess.queryContext(ctx, q.SQL, q.Args...)
 	if err != nil {
 		return nil, err
 	}
@@ -177,7 +177,7 @@ func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 		return nil, err
 	}
 	tp := new(T)
-	val := s.db.creator(s.model, tp)
+	val := s.creator(s.model, tp)
 
 	err = val.SetColumns(row)
 	return tp, err
@@ -189,7 +189,7 @@ func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 		return nil, err
 	}
 	var result []*T
-	val := s.db.creator(s.model, &result)
+	val := s.creator(s.model, &result)
 	err = val.SetColumns(rows)
 	return result, err
 }

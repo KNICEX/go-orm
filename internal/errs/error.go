@@ -35,3 +35,7 @@ func NewErrUnsupportedAssignable(assign any) error {
 func NewErrUnsupportedSetAble(setAble any) error {
 	return fmt.Errorf("orm: unsupported setAble type %v", setAble)
 }
+
+func NewErrFailedToRollback(bizErr error, rollbackErr error) error {
+	return fmt.Errorf("orm: failed to rollback transaction, business error: %w, rollback error: %v", bizErr, rollbackErr)
+}
