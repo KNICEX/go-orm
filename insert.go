@@ -1,29 +1,39 @@
 package orm
 
 import (
+	"context"
 	"github.com/KNICEX/go-orm/internal/errs"
 	"github.com/KNICEX/go-orm/model"
-	"reflect"
 )
 
-type OnDuplicateKeyBuilder[T any] struct {
-	i *Inserter[T]
+type UpsertBuilder[T any] struct {
+	i               *Inserter[T]
+	conflictColumns []string
 }
 
-type OnDuplicateKey struct {
-	assigns []Assignable
+type Upsert struct {
+	assigns         []Assignable
+	conflictColumns []string
 }
 
-func (o *OnDuplicateKeyBuilder[T]) Update(assigns ...Assignable) *Inserter[T] {
-	o.i.onDuplicateKey = &OnDuplicateKey{
-		assigns: assigns,
+func (o *UpsertBuilder[T]) Update(assigns ...Assignable) *Inserter[T] {
+	o.i.onDuplicateKey = &Upsert{
+		assigns:         assigns,
+		conflictColumns: o.conflictColumns,
 	}
 	return o.i
+}
+
+func (o *UpsertBuilder[T]) ConflictColumns(columns ...string) *UpsertBuilder[T] {
+	o.conflictColumns = columns
+	return o
 }
 
 type Assignable interface {
 	assign()
 }
+
+var _ Executor = (*Inserter[any])(nil)
 
 type Inserter[T any] struct {
 	db *DB
@@ -32,7 +42,7 @@ type Inserter[T any] struct {
 	values  []*T
 	columns []string
 
-	onDuplicateKey *OnDuplicateKey
+	onDuplicateKey *Upsert
 }
 
 func NewInserter[T any](db *DB) *Inserter[T] {
@@ -45,8 +55,8 @@ func NewInserter[T any](db *DB) *Inserter[T] {
 	}
 }
 
-func (i *Inserter[T]) OnDuplicateKey() *OnDuplicateKeyBuilder[T] {
-	return &OnDuplicateKeyBuilder[T]{
+func (i *Inserter[T]) OnDuplicateKey() *UpsertBuilder[T] {
+	return &UpsertBuilder[T]{
 		i: i,
 	}
 }
@@ -99,14 +109,17 @@ func (i *Inserter[T]) Build() (*Query, error) {
 			i.sb.WriteByte(',')
 		}
 		i.sb.WriteByte('(')
-
-		refVal := reflect.ValueOf(v).Elem()
+		val := i.db.creator(m, v)
 		for j, field := range fields {
 			if j > 0 {
 				i.sb.WriteByte(',')
 			}
 			i.sb.WriteByte('?')
-			i.addArgs(refVal.FieldByName(field.GoName).Interface())
+			arg, err := val.Field(field.GoName)
+			if err != nil {
+				return nil, err
+			}
+			i.addArgs(arg)
 		}
 
 		i.sb.WriteByte(')')
@@ -114,7 +127,7 @@ func (i *Inserter[T]) Build() (*Query, error) {
 
 	// 处理 ON DUPLICATE KEY UPDATE
 	if i.onDuplicateKey != nil {
-		err = i.dialect.buildOnDuplicateKey(&i.builder, i.onDuplicateKey)
+		err = i.dialect.buildUpsert(&i.builder, i.onDuplicateKey)
 		if err != nil {
 			return nil, err
 		}
@@ -136,4 +149,16 @@ func (i *Inserter[T]) Values(values ...*T) *Inserter[T] {
 func (i *Inserter[T]) Columns(cols ...string) *Inserter[T] {
 	i.columns = cols
 	return i
+}
+
+func (i *Inserter[T]) Exec(ctx context.Context) Result {
+	query, err := i.Build()
+	if err != nil {
+		return Result{err: err}
+	}
+	res, err := i.db.db.ExecContext(ctx, query.SQL, query.Args...)
+	return Result{
+		res: res,
+		err: err,
+	}
 }

@@ -3,6 +3,7 @@ package orm
 import (
 	"context"
 	"database/sql"
+	"github.com/KNICEX/go-orm/internal/errs"
 )
 
 // Selectable 标记接口
@@ -10,14 +11,26 @@ type Selectable interface {
 	selectable()
 }
 
+type GroupAble interface {
+	groupAble()
+}
+
 type Selector[T any] struct {
-	table   string
-	where   []Predicate
-	columns []Selectable
+	table    string
+	where    []Predicate
+	columns  []Selectable
+	orderBys []OrderAble
+	groupBys []GroupAble
+	having   []Predicate
+	offset   int
+	limit    int
 
 	builder
-
 	db *DB
+}
+
+type OrderAble interface {
+	orderAble()
 }
 
 func NewSelector[T any](db *DB) *Selector[T] {
@@ -55,11 +68,72 @@ func (s *Selector[T]) Build() (*Query, error) {
 	// 条件构造
 	if len(s.where) > 0 {
 		s.sb.WriteString(" WHERE ")
-
 		if err := s.buildPredicate(s.where); err != nil {
 			return nil, err
 		}
+	}
 
+	// 排序
+	if len(s.orderBys) > 0 {
+		s.sb.WriteString(" ORDER BY ")
+		for i, ob := range s.orderBys {
+			if i > 0 {
+				s.sb.WriteByte(',')
+			}
+			switch o := ob.(type) {
+			case Column:
+				fd, ok := s.model.FieldMap[o.name]
+				if !ok {
+					return nil, errs.NewErrUnknownField(o.name)
+				}
+				s.quote(fd.ColName)
+				if o.desc {
+					s.sb.WriteString(" DESC")
+				} else {
+					s.sb.WriteString(" ASC")
+				}
+			case RawExpr:
+				s.sb.WriteByte('(')
+				s.sb.WriteString(o.raw)
+				s.sb.WriteByte(')')
+			}
+		}
+	}
+
+	// 分组
+	if len(s.groupBys) > 0 {
+		s.sb.WriteString(" GROUP BY ")
+		for i, gb := range s.groupBys {
+			if i > 0 {
+				s.sb.WriteByte(',')
+			}
+			switch g := gb.(type) {
+			case Column:
+				fd, ok := s.model.FieldMap[g.name]
+				if !ok {
+					return nil, errs.NewErrUnknownField(g.name)
+				}
+				s.quote(fd.ColName)
+			case RawExpr:
+				s.sb.WriteByte('(')
+				s.sb.WriteString(g.raw)
+				s.sb.WriteByte(')')
+			}
+		}
+
+		if len(s.having) > 0 {
+			// having
+			s.sb.WriteString(" HAVING ")
+			if err = s.buildPredicate(s.having); err != nil {
+				return nil, err
+			}
+		}
+
+	}
+
+	// limit offset
+	if err := s.dialect.buildOffsetLimit(&s.builder, s.offset, s.limit); err != nil {
+		return nil, err
 	}
 
 	s.sb.WriteByte(';')
@@ -98,6 +172,7 @@ func (s *Selector[T]) beforeQuery(ctx context.Context) (*sql.Rows, error) {
 }
 
 func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
+	s.limit = 1
 	row, err := s.beforeQuery(ctx)
 	if err != nil {
 		return nil, err
@@ -122,5 +197,30 @@ func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 
 func (s *Selector[T]) Where(p Predicate) *Selector[T] {
 	s.where = append(s.where, p)
+	return s
+}
+
+func (s *Selector[T]) Offset(offset int) *Selector[T] {
+	s.offset = offset
+	return s
+}
+
+func (s *Selector[T]) Limit(limit int) *Selector[T] {
+	s.limit = limit
+	return s
+}
+
+func (s *Selector[T]) OrderBy(orderBys ...OrderAble) *Selector[T] {
+	s.orderBys = orderBys
+	return s
+}
+
+func (s *Selector[T]) GroupBy(groupBys ...GroupAble) *Selector[T] {
+	s.groupBys = groupBys
+	return s
+}
+
+func (s *Selector[T]) Having(p Predicate) *Selector[T] {
+	s.having = append(s.having, p)
 	return s
 }

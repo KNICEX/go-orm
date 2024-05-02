@@ -2,7 +2,6 @@ package orm
 
 import (
 	"context"
-	"database/sql"
 )
 
 type Deleter[T any] struct {
@@ -13,6 +12,8 @@ type Deleter[T any] struct {
 
 	db *DB
 }
+
+var _ Executor = (*Deleter[any])(nil)
 
 func NewDeleter[T any](db *DB) *Deleter[T] {
 	return &Deleter[T]{
@@ -67,10 +68,16 @@ func (d *Deleter[T]) Where(p Predicate) *Deleter[T] {
 	return d
 }
 
-func (d *Deleter[T]) Exec(ctx context.Context) (sql.Result, error) {
+func (d *Deleter[T]) Exec(ctx context.Context) Result {
 	q, err := d.Build()
 	if err != nil {
-		return nil, err
+		return Result{
+			err: err,
+		}
 	}
-	return d.db.db.ExecContext(ctx, q.SQL, q.Args...)
+	res, err := d.db.db.ExecContext(ctx, q.SQL, q.Args...)
+	return Result{
+		res: res,
+		err: err,
+	}
 }

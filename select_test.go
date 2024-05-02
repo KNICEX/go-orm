@@ -17,7 +17,7 @@ type TestModel struct {
 }
 
 func TestSelector_Build(t *testing.T) {
-	db, err := OpenDB(nil)
+	db, err := OpenDB(nil, DBWithDialect(DialectMySQL))
 	require.NoError(t, err)
 	testCases := []struct {
 		name      string
@@ -102,6 +102,66 @@ func TestSelector_Build(t *testing.T) {
 				Args: []any{18},
 			},
 		},
+
+		{
+			name:    "limit",
+			builder: NewSelector[TestModel](db).Where(Col("Id").Ge(1)).Limit(10),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `test_model` WHERE `id` >= ? LIMIT 10;",
+				Args: []any{1},
+			},
+		},
+		{
+			name:    "offset",
+			builder: NewSelector[TestModel](db).Where(Col("Id").Ge(1)).Offset(10),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `test_model` WHERE `id` >= ? OFFSET 10;",
+				Args: []any{1},
+			},
+		},
+		{
+			name:    "limit offset",
+			builder: NewSelector[TestModel](db).Where(Col("Id").Ge(1)).Limit(10).Offset(10),
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM `test_model` WHERE `id` >= ? LIMIT 10 OFFSET 10;",
+				Args: []any{1},
+			},
+		},
+
+		{
+			name:    "order by col",
+			builder: NewSelector[TestModel](db).OrderBy(Col("Id").Desc(), Col("FirstName").Asc()),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM `test_model` ORDER BY `id` DESC,`first_name` ASC;",
+			},
+		},
+		{
+			name:    "order by raw",
+			builder: NewSelector[TestModel](db).OrderBy(Raw("RAND()")),
+			wantQuery: &Query{
+				SQL: "SELECT * FROM `test_model` ORDER BY (RAND());",
+			},
+		},
+
+		{
+			name:    "group by",
+			builder: NewSelector[TestModel](db).Select(Col("FirstName"), Sum("FirstName")).GroupBy(Col("FirstName")),
+			wantQuery: &Query{
+				SQL: "SELECT `first_name`,SUM(`first_name`) FROM `test_model` GROUP BY `first_name`;",
+			},
+		},
+
+		{
+			name: "group by with having",
+			builder: NewSelector[TestModel](db).Select(Col("FirstName"), Sum("FirstName")).
+				GroupBy(Col("FirstName")).
+				Having(Sum("FirstName").Gt(1)),
+			wantQuery: &Query{
+				SQL: "SELECT `first_name`,SUM(`first_name`) FROM `test_model` " +
+					"GROUP BY `first_name` HAVING SUM(`first_name`) > ?;",
+				Args: []any{1},
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -116,37 +176,11 @@ func TestSelector_Build(t *testing.T) {
 	}
 }
 
-func TestRotate(t *testing.T) {
-	nums := []int{1, 2, 3, 4, 5, 6, 7}
-	rotate(nums, 3)
-	assert.Equal(t, []int{5, 6, 7, 1, 2, 3, 4}, nums)
-}
-
-func rotate(nums []int, k int) {
-	n := len(nums)
-	offset := k % n
-	if offset == 0 {
-		return
-	}
-
-	reverse(nums, 0, n)
-	reverse(nums, 0, offset)
-	reverse(nums, offset, n)
-
-}
-
-func reverse(nums []int, i, j int) {
-	n := (i + j) / 2
-	for start := i; start < n; start++ {
-		nums[start], nums[j-1-(start-i)] = nums[j-1-(start-i)], nums[start]
-	}
-}
-
 // 必须一次运行所有测试用例，因为 mock.ExpectQuery() 会按照调用顺序匹配
 func TestSelector_Get(t *testing.T) {
 	mockDB, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	db, err := OpenDB(mockDB)
+	db, err := OpenDB(mockDB, DBWithDialect(DialectMySQL))
 	require.NoError(t, err)
 
 	// 查询错误
@@ -208,7 +242,7 @@ func TestSelector_Get(t *testing.T) {
 func TestSelector_GetMulti(t *testing.T) {
 	mockDB, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	db, err := OpenDB(mockDB)
+	db, err := OpenDB(mockDB, DBWithDialect(DialectMySQL))
 	require.NoError(t, err)
 
 	testCases := []struct {
@@ -253,7 +287,7 @@ func TestSelector_GetMulti(t *testing.T) {
 }
 
 func TestSelector_Select(t *testing.T) {
-	db, err := OpenDB(nil)
+	db, err := OpenDB(nil, DBWithDialect(DialectMySQL))
 	require.NoError(t, err)
 	testCases := []struct {
 		name      string

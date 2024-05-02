@@ -127,6 +127,13 @@ func (b *builder) buildExpression(expr Expression) error {
 		b.sb.WriteString(exp.raw)
 		b.sb.WriteByte(')')
 		b.addArgs(exp.args...)
+	case Aggregate:
+		b.sb.WriteString(exp.fn)
+		b.sb.WriteByte('(')
+		if err := b.buildColumn(Column{name: exp.arg}); err != nil {
+			return err
+		}
+		b.sb.WriteByte(')')
 	default:
 		return errs.NewErrUnsupportedExpression(expr)
 	}

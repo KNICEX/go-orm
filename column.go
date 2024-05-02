@@ -1,8 +1,14 @@
 package orm
 
+const (
+	asc  = "ASC"
+	desc = "DESC"
+)
+
 type Column struct {
 	name  string
 	alias string
+	desc  bool
 }
 
 // 实现 Expression 标记接口， Column 可以作为一个表达式
@@ -13,6 +19,12 @@ func (c Column) selectable() {}
 
 // 实现 assignable 标记接口， Column 可以作为一个ON DUPLICATE KEY UPDATE语句的列
 func (c Column) assign() {}
+
+// 实现 orderBy 标记接口， Column 可以作为一个ORDER BY语句的列
+func (c Column) orderAble() {}
+
+// 实现 groupBy 标记接口， Column 可以作为一个GROUP BY语句的列
+func (c Column) groupAble() {}
 
 func Col(name string) Column {
 	return Column{name: name}
@@ -73,5 +85,18 @@ func (c Column) Le(arg any) Predicate {
 		left:  c,
 		op:    opLe,
 		right: valueOf(arg),
+	}
+}
+
+func (c Column) Asc() Column {
+	return Column{
+		name: c.name,
+	}
+}
+
+func (c Column) Desc() Column {
+	return Column{
+		name: c.name,
+		desc: true,
 	}
 }

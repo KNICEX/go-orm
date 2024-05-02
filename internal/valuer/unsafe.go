@@ -11,6 +11,9 @@ import (
 type unsafeValue struct {
 	model *model.Model
 	val   any
+
+	// 仅用于Field方法
+	addr unsafe.Pointer
 }
 
 var _ Creator = NewUnsafeValue
@@ -21,7 +24,18 @@ func NewUnsafeValue(model *model.Model, val any) Value {
 	return &unsafeValue{
 		model: model,
 		val:   val,
+		addr:  reflect.ValueOf(val).UnsafePointer(),
 	}
+}
+
+func (u *unsafeValue) Field(name string) (any, error) {
+	fd, ok := u.model.FieldMap[name]
+	if !ok {
+		return nil, errs.NewErrUnknownColumn(name)
+	}
+	fdPtr := unsafe.Pointer(uintptr(u.addr) + fd.Offset)
+	return reflect.NewAt(fd.Typ, fdPtr).Elem().Interface(), nil
+
 }
 
 func (u *unsafeValue) SetColumns(rows *sql.Rows) error {

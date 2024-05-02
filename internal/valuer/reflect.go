@@ -9,7 +9,7 @@ import (
 
 type reflectValue struct {
 	model *model.Model
-	val   any
+	val   reflect.Value
 }
 
 var _ Creator = NewReflectValue
@@ -20,8 +20,12 @@ func NewReflectValue(model *model.Model, val any) Value {
 
 	return &reflectValue{
 		model: model,
-		val:   val,
+		val:   reflect.ValueOf(val).Elem(),
 	}
+}
+
+func (r *reflectValue) Field(name string) (any, error) {
+	return r.val.FieldByName(name).Interface(), nil
 }
 
 func (r *reflectValue) SetColumns(rows *sql.Rows) error {
@@ -29,27 +33,26 @@ func (r *reflectValue) SetColumns(rows *sql.Rows) error {
 	if err != nil {
 		return err
 	}
-	tpValue := reflect.ValueOf(r.val).Elem()
 
-	if tpValue.Kind() == reflect.Slice {
+	if r.val.Kind() == reflect.Slice {
 		// 切片元素一定是结构体一级指针
-		entityType := tpValue.Type().Elem()
+		entityType := r.val.Type().Elem()
 		entity := reflect.New(entityType.Elem()).Interface()
 		// 调用该方法前会调用rows.Next()，所以这里第一行不需要再调用
 		if err = r.setRow(cs, rows, entity); err != nil {
 			return err
 		}
-		tpValue.Set(reflect.Append(tpValue, reflect.ValueOf(entity)))
+		r.val.Set(reflect.Append(r.val, reflect.ValueOf(entity)))
 		for rows.Next() {
 			entity = reflect.New(entityType.Elem()).Interface()
 			if err = r.setRow(cs, rows, entity); err != nil {
 				return err
 			}
-			tpValue.Set(reflect.Append(tpValue, reflect.ValueOf(entity)))
+			r.val.Set(reflect.Append(r.val, reflect.ValueOf(entity)))
 		}
 		return nil
 	} else {
-		return r.setRow(cs, rows, r.val)
+		return r.setRow(cs, rows, r.val.Addr().Interface())
 	}
 }
 
