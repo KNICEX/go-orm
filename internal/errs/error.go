@@ -9,6 +9,7 @@ var (
 	ErrModelType     = errors.New("orm: only support struct pointer")
 	ErrNoRows        = errors.New("orm: no rows")
 	ErrInsertZeroRow = errors.New("orm: insert zero row")
+	ErrUpdateNoSet   = errors.New("orm: update no set")
 )
 
 func NewErrUnsupportedExpression(expr any) error {
@@ -29,4 +30,8 @@ func NewErrUnknownColumn(name string) error {
 
 func NewErrUnsupportedAssignable(assign any) error {
 	return fmt.Errorf("orm: unsupported assignable type %v", assign)
+}
+
+func NewErrUnsupportedSetAble(setAble any) error {
+	return fmt.Errorf("orm: unsupported setAble type %v", setAble)
 }

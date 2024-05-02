@@ -15,6 +15,7 @@ func (r RawExpr) selectable() {}
 func (r RawExpr) expr()       {}
 func (r RawExpr) orderAble()  {}
 func (r RawExpr) groupAble()  {}
+func (r RawExpr) setAble()    {}
 
 // Raw 创建一个原始表达式
 // Raw 不会对表达式进行任何处理，直接拼接到 SQL 语句中

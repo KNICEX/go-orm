@@ -15,7 +15,7 @@ type Executor interface {
 	Exec(ctx context.Context) Result
 }
 
-type QueryBuilder interface {
+type SqlBuilder interface {
 	Build() (*Query, error)
 }
 

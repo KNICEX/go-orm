@@ -14,6 +14,9 @@ type Selectable interface {
 type GroupAble interface {
 	groupAble()
 }
+type OrderAble interface {
+	orderAble()
+}
 
 type Selector[T any] struct {
 	table    string
@@ -27,10 +30,6 @@ type Selector[T any] struct {
 
 	builder
 	db *DB
-}
-
-type OrderAble interface {
-	orderAble()
 }
 
 func NewSelector[T any](db *DB) *Selector[T] {

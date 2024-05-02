@@ -21,7 +21,7 @@ func TestSelector_Build(t *testing.T) {
 	require.NoError(t, err)
 	testCases := []struct {
 		name      string
-		builder   QueryBuilder
+		builder   SqlBuilder
 		wantQuery *Query
 		wantErr   error
 	}{
@@ -291,7 +291,7 @@ func TestSelector_Select(t *testing.T) {
 	require.NoError(t, err)
 	testCases := []struct {
 		name      string
-		s         QueryBuilder
+		s         SqlBuilder
 		wantQuery *Query
 		wantErr   error
 	}{
