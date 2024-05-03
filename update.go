@@ -94,16 +94,36 @@ func (u *Updater[T]) Where(predicates Predicate) *Updater[T] {
 	return u
 }
 
-func (u *Updater[T]) Exec(ctx context.Context) Result {
+func (u *Updater[T]) execHandler(ctx *Context) *Result {
+	res, err := u.sess.execContext(ctx.Ctx, ctx.Query.SQL, ctx.Query.Args...)
+	return &Result{
+		Res: ExecResult{
+			res: res,
+			err: err,
+		},
+		Err: err,
+	}
+}
+
+func (u *Updater[T]) Exec(ctx context.Context) ExecResult {
 	q, err := u.Build()
 	if err != nil {
-		return Result{
+		return ExecResult{
 			err: err,
 		}
 	}
-	res, err := u.sess.execContext(ctx, q.SQL, q.Args...)
-	return Result{
-		res: res,
-		err: err,
+
+	root := u.execHandler
+	for i := len(u.middlewares) - 1; i >= 0; i-- {
+		root = u.middlewares[i](root)
 	}
+
+	res := root(&Context{
+		Type:  UPDATE,
+		Query: q,
+		Model: u.model,
+		Ctx:   ctx,
+	})
+
+	return res.Res.(ExecResult)
 }

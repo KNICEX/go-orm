@@ -56,6 +56,12 @@ func DBWithRegistry(r model.Registry) DBOption {
 	}
 }
 
+func DBWithMiddlewares(middlewares ...Middleware) DBOption {
+	return func(db *DB) {
+		db.middlewares = append(db.middlewares, middlewares...)
+	}
+}
+
 func DBWithDialect(d Dialect) DBOption {
 	return func(db *DB) {
 		db.dialect = d
@@ -89,11 +95,7 @@ func (db *DB) execContext(ctx context.Context, query string, args ...any) (sql.R
 }
 
 func (db *DB) getCore() core {
-	return core{
-		r:       db.r,
-		dialect: db.dialect,
-		creator: db.creator,
-	}
+	return db.core
 }
 
 func (db *DB) DoTx(ctx context.Context,

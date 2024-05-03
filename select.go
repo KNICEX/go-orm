@@ -2,7 +2,6 @@ package orm
 
 import (
 	"context"
-	"database/sql"
 	"github.com/KNICEX/go-orm/internal/errs"
 )
 
@@ -17,6 +16,8 @@ type GroupAble interface {
 type OrderAble interface {
 	orderAble()
 }
+
+var _ Handler = (*Selector[any])(nil).getHandler
 
 type Selector[T any] struct {
 	table    string
@@ -153,45 +154,85 @@ func (s *Selector[T]) From(table string) *Selector[T] {
 	return s
 }
 
-// beforeQuery 查询和查询前后的检查
-func (s *Selector[T]) beforeQuery(ctx context.Context) (*sql.Rows, error) {
-	q, err := s.Build()
+func (s *Selector[T]) getHandler(ctx *Context) *Result {
+	rows, err := s.sess.queryContext(ctx.Ctx, ctx.Query.SQL, ctx.Query.Args...)
 	if err != nil {
-		return nil, err
-	}
-	row, err := s.sess.queryContext(ctx, q.SQL, q.Args...)
-	if err != nil {
-		return nil, err
+		return &Result{Err: err}
 	}
 
-	if !row.Next() {
-		return nil, ErrorNoRows
+	if !rows.Next() {
+		return &Result{Err: ErrorNoRows}
 	}
-	return row, nil
+
+	val := s.creator(s.model, nil)
+	err = val.SetColumns(rows)
+	if err != nil {
+		return &Result{Err: err}
+	}
+	return &Result{Res: val}
 }
 
 func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	s.limit = 1
-	row, err := s.beforeQuery(ctx)
+	q, err := s.Build()
 	if err != nil {
 		return nil, err
 	}
-	tp := new(T)
-	val := s.creator(s.model, tp)
 
-	err = val.SetColumns(row)
-	return tp, err
+	root := s.getHandler
+	for i := len(s.middlewares) - 1; i >= 0; i-- {
+		root = s.middlewares[i](root)
+	}
+	res := root(&Context{
+		Type:  SELECT,
+		Query: q,
+		Model: s.model,
+		Ctx:   ctx,
+	})
+	if res.Res != nil {
+		return res.Res.(*T), nil
+	}
+	return nil, res.Err
+}
+
+func (s *Selector[T]) getMultiHandler(ctx *Context) *Result {
+	rows, err := s.sess.queryContext(ctx.Ctx, ctx.Query.SQL, ctx.Query.Args...)
+	if err != nil {
+		return &Result{Err: err}
+	}
+
+	var result []*T
+	val := s.creator(s.model, &result)
+	for rows.Next() {
+		err = val.SetColumns(rows)
+		if err != nil {
+			return &Result{Err: err}
+		}
+	}
+
+	return &Result{Res: result}
 }
 
 func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
-	rows, err := s.beforeQuery(ctx)
+	q, err := s.Build()
 	if err != nil {
 		return nil, err
 	}
-	var result []*T
-	val := s.creator(s.model, &result)
-	err = val.SetColumns(rows)
-	return result, err
+
+	root := s.getMultiHandler
+	for i := len(s.middlewares) - 1; i >= 0; i-- {
+		root = s.middlewares[i](root)
+	}
+	res := root(&Context{
+		Type:  SELECT,
+		Query: q,
+		Model: s.model,
+		Ctx:   ctx,
+	})
+	if res.Res != nil {
+		return res.Res.([]*T), nil
+	}
+	return nil, res.Err
 }
 
 func (s *Selector[T]) Where(p Predicate) *Selector[T] {

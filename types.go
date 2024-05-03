@@ -12,7 +12,7 @@ type Querier[T any] interface {
 
 // Executor 用于增删改
 type Executor interface {
-	Exec(ctx context.Context) Result
+	Exec(ctx context.Context) ExecResult
 }
 
 type SqlBuilder interface {

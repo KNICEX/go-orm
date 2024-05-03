@@ -10,4 +10,6 @@ type core struct {
 	dialect Dialect
 	creator valuer.Creator
 	r       model.Registry
+
+	middlewares []Middleware
 }

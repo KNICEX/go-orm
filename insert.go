@@ -152,14 +152,34 @@ func (i *Inserter[T]) Columns(cols ...string) *Inserter[T] {
 	return i
 }
 
-func (i *Inserter[T]) Exec(ctx context.Context) Result {
-	query, err := i.Build()
+func (i *Inserter[T]) execHandler(ctx *Context) *Result {
+	sqlResult, err := i.sess.execContext(ctx.Ctx, ctx.Query.SQL, ctx.Query.Args...)
+	return &Result{
+		Err: err,
+		Res: ExecResult{
+			res: sqlResult,
+			err: err,
+		},
+	}
+}
+
+func (i *Inserter[T]) Exec(ctx context.Context) ExecResult {
+	q, err := i.Build()
 	if err != nil {
-		return Result{err: err}
+		return ExecResult{
+			err: err,
+		}
 	}
-	res, err := i.sess.execContext(ctx, query.SQL, query.Args...)
-	return Result{
-		res: res,
-		err: err,
+
+	root := i.execHandler
+	for _, m := range i.middlewares {
+		root = m(root)
 	}
+	res := root(&Context{
+		Type:  INSERT,
+		Query: q,
+		Model: i.model,
+		Ctx:   ctx,
+	})
+	return res.Res.(ExecResult)
 }
