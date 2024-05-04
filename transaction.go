@@ -12,19 +12,24 @@ var (
 )
 
 type Session interface {
-	getCore() core
+	getCore() *core
 	queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
 	execContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	queryRowContext(ctx context.Context, query string, args ...any) *sql.Row
 }
 
 type Tx struct {
 	tx *sql.Tx
-	db *DB
+	*DB
 }
 
-func (t *Tx) getCore() core {
-	return t.db.core
-
+func (t *Tx) getCore() *core {
+	return &core{
+		dialect:     t.dialect,
+		creator:     t.creator,
+		r:           t.r,
+		middlewares: t.middlewares,
+	}
 }
 
 func (t *Tx) Commit() error {
@@ -37,6 +42,10 @@ func (t *Tx) Rollback() error {
 
 func (t *Tx) queryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error) {
 	return t.tx.QueryContext(ctx, query, args...)
+}
+
+func (t *Tx) queryRowContext(ctx context.Context, query string, args ...any) *sql.Row {
+	return t.tx.QueryRowContext(ctx, query, args...)
 }
 
 func (t *Tx) execContext(ctx context.Context, query string, args ...any) (sql.Result, error) {

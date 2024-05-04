@@ -4,4 +4,4 @@ import (
 	"github.com/KNICEX/go-orm/internal/errs"
 )
 
-var ErrorNoRows = errs.ErrNoRows
+var ErrNoRows = errs.ErrNoRows

@@ -152,34 +152,55 @@ func (i *Inserter[T]) Columns(cols ...string) *Inserter[T] {
 	return i
 }
 
-func (i *Inserter[T]) execHandler(ctx *Context) *Result {
-	sqlResult, err := i.sess.execContext(ctx.Ctx, ctx.Query.SQL, ctx.Query.Args...)
+// execHandler 执行各种exec操作
+func execHandler(ctx *Context, sess Session) *Result {
+	res, err := sess.execContext(ctx.Ctx, ctx.Query.SQL, ctx.Query.Args...)
+	if err != nil {
+		return &Result{
+			Res: ExecResult{
+				err: err,
+			},
+			Err: err,
+		}
+	}
+
 	return &Result{
-		Err: err,
 		Res: ExecResult{
-			res: sqlResult,
+			res: res,
 			err: err,
 		},
 	}
 }
 
-func (i *Inserter[T]) Exec(ctx context.Context) ExecResult {
-	q, err := i.Build()
+// exec 执行各种exec操作
+// 包装一些相同的操作：构建sql，构造handler链，构造Context
+func exec(ctx context.Context, builder SqlBuilder, sess Session, c *core, opType string) ExecResult {
+	q, err := builder.Build()
 	if err != nil {
 		return ExecResult{
 			err: err,
 		}
 	}
 
-	root := i.execHandler
-	for _, m := range i.middlewares {
-		root = m(root)
+	// 将 execHandler 包装成 Handler
+	var root Handler = func(ctx *Context) *Result {
+		return execHandler(ctx, sess)
 	}
+
+	for i := len(c.middlewares) - 1; i >= 0; i-- {
+		root = c.middlewares[i](root)
+	}
+
 	res := root(&Context{
-		Type:  INSERT,
+		Type:  opType,
 		Query: q,
-		Model: i.model,
 		Ctx:   ctx,
+		Model: c.model,
 	})
+
 	return res.Res.(ExecResult)
+}
+
+func (i *Inserter[T]) Exec(ctx context.Context) ExecResult {
+	return exec(ctx, i, i.sess, i.core, INSERT)
 }

@@ -41,4 +41,8 @@ func TestNewLogBuilder(t *testing.T) {
 	_ = orm.NewDeleter[TestModel](db).Where(orm.Col("Id").Eq(12)).Exec(context.Background())
 	assert.Equal(t, "DELETE FROM `test_model` WHERE `id` = ?;", query)
 	assert.Equal(t, []any{12}, args)
+
+	_, _ = orm.NewSelector[TestModel](db).Where(orm.Col("Id").Eq(12)).Count(context.Background())
+	assert.Equal(t, "SELECT COUNT(*) FROM `test_model` WHERE `id` = ?;", query)
+	assert.Equal(t, []any{12}, args)
 }

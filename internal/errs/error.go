@@ -39,3 +39,11 @@ func NewErrUnsupportedSetAble(setAble any) error {
 func NewErrFailedToRollback(bizErr error, rollbackErr error) error {
 	return fmt.Errorf("orm: failed to rollback transaction, business error: %w, rollback error: %v", bizErr, rollbackErr)
 }
+
+func NewErrTableNotExist(tableName string) error {
+	return fmt.Errorf("orm: table %s does not exist", tableName)
+}
+
+func NewErrTableExist(tableName string) error {
+	return fmt.Errorf("orm: table %s already exists", tableName)
+}

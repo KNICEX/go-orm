@@ -6,7 +6,7 @@ import (
 )
 
 type builder struct {
-	core
+	*core
 	args []any
 	sb   strings.Builder
 

@@ -62,7 +62,7 @@ func TestIterateFields(t *testing.T) {
 			entity: User{Id: 1, Name: "foo", inner: "bar"},
 			wantRes: map[string]any{
 				"Id":    1,
-				"Name":  "foo",
+				"name":  "foo",
 				"inner": "",
 			},
 		},
@@ -75,7 +75,7 @@ func TestIterateFields(t *testing.T) {
 			},
 			wantRes: map[string]any{
 				"Id":    1,
-				"Name":  "foo",
+				"name":  "foo",
 				"inner": "",
 			},
 		},
@@ -140,7 +140,7 @@ func TestSetField(t *testing.T) {
 		{
 			name:       "user pointer",
 			entity:     &User{Id: 1, Name: "foo", inner: "bar"},
-			field:      "Name",
+			field:      "name",
 			newVal:     "bar",
 			wantEntity: &User{Id: 1, Name: "bar", inner: "bar"},
 		},

@@ -17,8 +17,6 @@ type OrderAble interface {
 	orderAble()
 }
 
-var _ Handler = (*Selector[any])(nil).getHandler
-
 type Selector[T any] struct {
 	table    string
 	where    []Predicate
@@ -26,8 +24,10 @@ type Selector[T any] struct {
 	orderBys []OrderAble
 	groupBys []GroupAble
 	having   []Predicate
-	offset   int
-	limit    int
+	// 只查询COUNT
+	count  bool
+	offset int
+	limit  int
 
 	builder
 	sess Session
@@ -53,7 +53,10 @@ func (s *Selector[T]) Build() (*Query, error) {
 
 	s.sb.WriteString("SELECT ")
 
-	if err = s.buildColumns(s.columns); err != nil {
+	if s.count {
+		// 只查询 COUNT
+		s.sb.WriteString("COUNT(*)")
+	} else if err = s.buildColumns(s.columns); err != nil {
 		return nil, err
 	}
 
@@ -133,7 +136,7 @@ func (s *Selector[T]) Build() (*Query, error) {
 	}
 
 	// limit offset
-	if err := s.dialect.buildOffsetLimit(&s.builder, s.offset, s.limit); err != nil {
+	if err = s.dialect.buildOffsetLimit(&s.builder, s.offset, s.limit); err != nil {
 		return nil, err
 	}
 
@@ -154,72 +157,106 @@ func (s *Selector[T]) From(table string) *Selector[T] {
 	return s
 }
 
-func (s *Selector[T]) getHandler(ctx *Context) *Result {
-	rows, err := s.sess.queryContext(ctx.Ctx, ctx.Query.SQL, ctx.Query.Args...)
+func getHandler(ctx *Context, sess Session, c *core, entity any) *Result {
+	rows, err := sess.queryContext(ctx.Ctx, ctx.Query.SQL, ctx.Query.Args...)
 	if err != nil {
 		return &Result{Err: err}
 	}
-
+	defer rows.Close()
 	if !rows.Next() {
-		return &Result{Err: ErrorNoRows}
+		return &Result{Err: ErrNoRows}
 	}
 
-	val := s.creator(s.model, nil)
+	val := c.creator(c.model, entity)
 	err = val.SetColumns(rows)
 	if err != nil {
-		return &Result{Err: err}
+		return &Result{
+			Err: err,
+		}
 	}
-	return &Result{Res: val}
+	return &Result{
+		Res: entity,
+	}
+
+}
+
+func get(ctx context.Context, builder SqlBuilder, sess Session, c *core, opType string, entity any) error {
+	q, err := builder.Build()
+	if err != nil {
+		return err
+	}
+
+	var root Handler = func(ctx *Context) *Result {
+		return getHandler(ctx, sess, c, entity)
+	}
+
+	for i := len(c.middlewares) - 1; i >= 0; i-- {
+		root = c.middlewares[i](root)
+	}
+
+	res := root(&Context{
+		Type:  opType,
+		Query: q,
+		Model: c.model,
+		Ctx:   ctx,
+	})
+
+	if res.Err != nil {
+		return res.Err
+	}
+	return nil
 }
 
 func (s *Selector[T]) Get(ctx context.Context) (*T, error) {
 	s.limit = 1
-	q, err := s.Build()
+	resEntity := new(T)
+	err := get(ctx, s, s.sess, s.core, SELECT, resEntity)
 	if err != nil {
 		return nil, err
 	}
-
-	root := s.getHandler
-	for i := len(s.middlewares) - 1; i >= 0; i-- {
-		root = s.middlewares[i](root)
-	}
-	res := root(&Context{
-		Type:  SELECT,
-		Query: q,
-		Model: s.model,
-		Ctx:   ctx,
-	})
-	if res.Res != nil {
-		return res.Res.(*T), nil
-	}
-	return nil, res.Err
-}
-
-func (s *Selector[T]) getMultiHandler(ctx *Context) *Result {
-	rows, err := s.sess.queryContext(ctx.Ctx, ctx.Query.SQL, ctx.Query.Args...)
-	if err != nil {
-		return &Result{Err: err}
-	}
-
-	var result []*T
-	val := s.creator(s.model, &result)
-	for rows.Next() {
-		err = val.SetColumns(rows)
-		if err != nil {
-			return &Result{Err: err}
-		}
-	}
-
-	return &Result{Res: result}
+	return resEntity, nil
 }
 
 func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
-	q, err := s.Build()
+	resEntity := new([]*T)
+	err := get(ctx, s, s.sess, s.core, SELECT, resEntity)
 	if err != nil {
 		return nil, err
 	}
+	return *resEntity, nil
 
-	root := s.getMultiHandler
+}
+
+func (s *Selector[T]) countHandler(ctx *Context) *Result {
+	rows, err := s.sess.queryContext(ctx.Ctx, ctx.Query.SQL, ctx.Query.Args...)
+	if err != nil {
+		return &Result{
+			Err: err,
+		}
+	}
+	defer rows.Close()
+
+	if !rows.Next() {
+		return &Result{
+			Err: ErrNoRows,
+		}
+	}
+	var count int64
+	err = rows.Scan(&count)
+	return &Result{
+		Res: count,
+		Err: err,
+	}
+}
+
+func (s *Selector[T]) Count(ctx context.Context) (int64, error) {
+	s.count = true
+	q, err := s.Build()
+	if err != nil {
+		return 0, err
+	}
+
+	root := s.countHandler
 	for i := len(s.middlewares) - 1; i >= 0; i-- {
 		root = s.middlewares[i](root)
 	}
@@ -230,9 +267,9 @@ func (s *Selector[T]) GetMulti(ctx context.Context) ([]*T, error) {
 		Ctx:   ctx,
 	})
 	if res.Res != nil {
-		return res.Res.([]*T), nil
+		return res.Res.(int64), nil
 	}
-	return nil, res.Err
+	return 0, res.Err
 }
 
 func (s *Selector[T]) Where(p Predicate) *Selector[T] {

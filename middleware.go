@@ -6,6 +6,7 @@ import (
 )
 
 const (
+	RAW    = "RAW"
 	SELECT = "SELECT"
 	INSERT = "INSERT"
 	UPDATE = "UPDATE"

@@ -54,9 +54,9 @@ func (u *Updater[T]) Build() (*Query, error) {
 		}
 		switch v := s.(type) {
 		case Assignment:
-			fd, ok := m.FieldMap[v.col]
+			fd, ok := m.FieldMap[v.name]
 			if !ok {
-				return nil, errs.NewErrUnknownField(v.col)
+				return nil, errs.NewErrUnknownField(v.name)
 			}
 			u.quote(fd.ColName)
 			u.sb.WriteString(" = ?")
@@ -94,36 +94,6 @@ func (u *Updater[T]) Where(predicates Predicate) *Updater[T] {
 	return u
 }
 
-func (u *Updater[T]) execHandler(ctx *Context) *Result {
-	res, err := u.sess.execContext(ctx.Ctx, ctx.Query.SQL, ctx.Query.Args...)
-	return &Result{
-		Res: ExecResult{
-			res: res,
-			err: err,
-		},
-		Err: err,
-	}
-}
-
 func (u *Updater[T]) Exec(ctx context.Context) ExecResult {
-	q, err := u.Build()
-	if err != nil {
-		return ExecResult{
-			err: err,
-		}
-	}
-
-	root := u.execHandler
-	for i := len(u.middlewares) - 1; i >= 0; i-- {
-		root = u.middlewares[i](root)
-	}
-
-	res := root(&Context{
-		Type:  UPDATE,
-		Query: q,
-		Model: u.model,
-		Ctx:   ctx,
-	})
-
-	return res.Res.(ExecResult)
+	return exec(ctx, u, u.sess, u.core, UPDATE)
 }

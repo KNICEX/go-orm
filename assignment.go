@@ -1,8 +1,8 @@
 package orm
 
 type Assignment struct {
-	col string
-	val any
+	name string
+	val  any
 }
 
 func (a Assignment) assign() {}
@@ -12,7 +12,7 @@ func (a Assignment) setAble() {}
 
 func Assign(col string, val any) Assignment {
 	return Assignment{
-		col: col,
-		val: val,
+		name: col,
+		val:  val,
 	}
 }

@@ -2,6 +2,7 @@ package orm
 
 import (
 	"github.com/KNICEX/go-orm/internal/errs"
+	"reflect"
 	"strconv"
 )
 
@@ -22,6 +23,9 @@ type Dialect interface {
 	quoter() byte
 	buildUpsert(sb *builder, upsert *Upsert) error
 	buildOffsetLimit(sb *builder, offset, limit int) error
+	DataTypeOf(typ reflect.Value) string
+	// TableExistSQL 生成的SQL查询的结果为表名，不存在则应该返回空集
+	TableExistSQL(tableName string) (string, []any)
 }
 
 type standardSQL struct {
@@ -47,6 +51,14 @@ func (s *standardSQL) buildOffsetLimit(b *builder, offset, limit int) error {
 	return nil
 }
 
+func (s *standardSQL) DataTypeOf(typ reflect.Value) string {
+	panic("not implemented")
+}
+
+func (s *standardSQL) TableExistSQL(tableName string) (string, []any) {
+	panic("not implemented")
+}
+
 type mysqlDialect struct {
 	standardSQL
 }
@@ -59,9 +71,9 @@ func (s *mysqlDialect) buildUpsert(b *builder, upsert *Upsert) error {
 		}
 		switch a := assign.(type) {
 		case Assignment:
-			fd, ok := b.model.FieldMap[a.col]
+			fd, ok := b.model.FieldMap[a.name]
 			if !ok {
-				return errs.NewErrUnknownField(a.col)
+				return errs.NewErrUnknownField(a.name)
 			}
 			b.quote(fd.ColName)
 			b.sb.WriteString(" = ?")
@@ -105,9 +117,9 @@ func (s *sqlite3Dialect) buildUpsert(b *builder, upsert *Upsert) error {
 		}
 		switch a := assign.(type) {
 		case Assignment:
-			fd, ok := b.model.FieldMap[a.col]
+			fd, ok := b.model.FieldMap[a.name]
 			if !ok {
-				return errs.NewErrUnknownField(a.col)
+				return errs.NewErrUnknownField(a.name)
 			}
 			b.quote(fd.ColName)
 			b.sb.WriteString(" = ?")

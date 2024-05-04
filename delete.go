@@ -68,35 +68,6 @@ func (d *Deleter[T]) Where(p Predicate) *Deleter[T] {
 	return d
 }
 
-func (d *Deleter[T]) execHandler(ctx *Context) *Result {
-	res, err := d.sess.execContext(ctx.Ctx, ctx.Query.SQL, ctx.Query.Args...)
-	return &Result{
-		Err: err,
-		Res: ExecResult{
-			res: res,
-			err: err,
-		},
-	}
-}
-
 func (d *Deleter[T]) Exec(ctx context.Context) ExecResult {
-	q, err := d.Build()
-	if err != nil {
-		return ExecResult{
-			err: err,
-		}
-	}
-
-	root := d.execHandler
-	for i := len(d.middlewares) - 1; i >= 0; i-- {
-		root = d.middlewares[i](root)
-	}
-
-	res := root(&Context{
-		Type:  DELETE,
-		Query: q,
-		Model: d.model,
-		Ctx:   ctx,
-	})
-	return res.Res.(ExecResult)
+	return exec(ctx, d, d.sess, d.core, DELETE)
 }

@@ -129,7 +129,7 @@ func TestSelector_Build(t *testing.T) {
 		},
 
 		{
-			name:    "order by col",
+			name:    "order by name",
 			builder: NewSelector[TestModel](db).OrderBy(Col("Id").Desc(), Col("FirstName").Asc()),
 			wantQuery: &Query{
 				SQL: "SELECT * FROM `test_model` ORDER BY `id` DESC,`first_name` ASC;",
@@ -353,4 +353,35 @@ func TestSelector_Select(t *testing.T) {
 			assert.Equal(t, tc.wantQuery, q)
 		})
 	}
+}
+
+func TestSelector_Count(t *testing.T) {
+	db, err := OpenDB(nil, DBWithDialect(DialectMySQL))
+	require.NoError(t, err)
+	testCases := []struct {
+		name      string
+		s         SqlBuilder
+		wantQuery *Query
+		wantErr   error
+	}{
+		{
+			name: "count",
+			s:    NewSelector[TestModel](db),
+			wantQuery: &Query{
+				SQL: "SELECT COUNT(*) FROM `test_model`;",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := tc.s.Build()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantQuery, q)
+		})
+	}
+
 }

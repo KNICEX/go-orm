@@ -12,7 +12,7 @@ func TestAccessor_Field(t *testing.T) {
 	}
 
 	accessor := NewAccessor(&User{Name: "test", Age: 18})
-	name, err := accessor.Field("Name")
+	name, err := accessor.Field("name")
 	require.NoError(t, err)
 	require.Equal(t, "test", name)
 
