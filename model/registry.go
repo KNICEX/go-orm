@@ -100,6 +100,7 @@ func (r *registry) Register(entity any, opts ...Option) (*Model, error) {
 	}
 
 	res := &Model{
+		typ:       typ,
 		TableName: tableName,
 		FieldMap:  fieldMap,
 		ColMap:    colMap,

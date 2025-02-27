@@ -1,7 +1,7 @@
 package orm
 
 type TableReference interface {
-	table()
+	tableAlias() string
 }
 
 type Table struct {
@@ -17,9 +17,8 @@ const (
 	rightJoin joinType = "RIGHT JOIN"
 )
 
-func (t Table) table() {
-	//TODO implement me
-	panic("implement me")
+func (t Table) tableAlias() string {
+	return t.alias
 }
 
 func TableOf(entity any) Table {
@@ -73,9 +72,8 @@ type Join struct {
 	using []string
 }
 
-func (j Join) table() {
-	//TODO implement me
-	panic("implement me")
+func (j Join) tableAlias() string {
+	return ""
 }
 
 func (j Join) Join(right TableReference) *JoinBuilder {
@@ -123,5 +121,87 @@ func (j *JoinBuilder) Using(cols ...string) Join {
 		right: j.right,
 		typ:   j.typ,
 		using: cols,
+	}
+}
+
+type SubQuery struct {
+	table TableReference
+	s     SqlBuilder
+	cols  []Selectable
+	alias string
+}
+
+func (s SubQuery) tableAlias() string {
+	return s.alias
+}
+
+func (s SubQuery) Col(name string) Column {
+	return Column{
+		table: s,
+		name:  name,
+	}
+}
+
+func (s SubQuery) Max(col string) Aggregate {
+	return Aggregate{
+		table: s,
+		fn:    "MAX",
+		arg:   col,
+	}
+}
+
+func (s SubQuery) Min(col string) Aggregate {
+	return Aggregate{
+		table: s,
+		fn:    "MIN",
+		arg:   col,
+	}
+}
+
+func (s SubQuery) Count(col string) Aggregate {
+	return Aggregate{
+		table: s,
+		fn:    "COUNT",
+		arg:   col,
+	}
+}
+
+func (s SubQuery) Sum(col string) Aggregate {
+	return Aggregate{
+		table: s,
+		fn:    "SUM",
+		arg:   col,
+	}
+}
+
+func (s SubQuery) Avg(col string) Aggregate {
+	return Aggregate{
+		table: s,
+		fn:    "AVG",
+		arg:   col,
+	}
+}
+
+func (s SubQuery) Join(right TableReference) *JoinBuilder {
+	return &JoinBuilder{
+		left:  s,
+		right: right,
+		typ:   innerJoin,
+	}
+}
+
+func (s SubQuery) LeftJoin(right TableReference) *JoinBuilder {
+	return &JoinBuilder{
+		left:  s,
+		right: right,
+		typ:   leftJoin,
+	}
+}
+
+func (s SubQuery) RightJoin(right TableReference) *JoinBuilder {
+	return &JoinBuilder{
+		left:  s,
+		right: right,
+		typ:   rightJoin,
 	}
 }

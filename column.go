@@ -17,7 +17,14 @@ type Column struct {
 func (c Column) expr() {}
 
 // 实现 selectable 标记接口， Column 可以作为一个SELECT语句的列
-func (c Column) selectable() {}
+func (c Column) selectedAlias() string { return c.alias }
+func (c Column) target() TableReference {
+	return c.table
+}
+
+func (c Column) fieldName() string {
+	return c.name
+}
 
 // 实现 assignable 标记接口， Column 可以作为一个ON DUPLICATE KEY UPDATE语句的列
 func (c Column) assign() {}
@@ -36,6 +43,7 @@ func (c Column) As(alias string) Column {
 	return Column{
 		name:  c.name,
 		alias: alias,
+		table: c.table,
 	}
 }
 
@@ -92,13 +100,15 @@ func (c Column) Le(arg any) Predicate {
 
 func (c Column) Asc() Column {
 	return Column{
-		name: c.name,
+		name:  c.name,
+		table: c.table,
 	}
 }
 
 func (c Column) Desc() Column {
 	return Column{
-		name: c.name,
-		desc: true,
+		name:  c.name,
+		desc:  true,
+		table: c.table,
 	}
 }

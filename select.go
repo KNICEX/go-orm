@@ -7,7 +7,9 @@ import (
 
 // Selectable 标记接口
 type Selectable interface {
-	selectable()
+	selectedAlias() string
+	target() TableReference
+	fieldName() string
 }
 
 type GroupAble interface {
@@ -110,15 +112,11 @@ func (s *Selector[T]) Build() (*Query, error) {
 			}
 			switch g := gb.(type) {
 			case Column:
-				fd, ok := s.model.FieldMap[g.name]
-				if !ok {
-					return nil, errs.NewErrUnknownField(g.name)
+				if err = s.buildColumn(g); err != nil {
+					return nil, err
 				}
-				s.quote(fd.ColName)
 			case RawExpr:
-				s.sb.WriteByte('(')
 				s.sb.WriteString(g.raw)
-				s.sb.WriteByte(')')
 			}
 		}
 
@@ -152,6 +150,17 @@ func (s *Selector[T]) Select(cols ...Selectable) *Selector[T] {
 func (s *Selector[T]) From(table TableReference) *Selector[T] {
 	s.table = table
 	return s
+}
+func (s *Selector[T]) AsSubQuery(alias string) SubQuery {
+	tab := s.table
+	if tab == nil {
+		tab = TableOf(new(T))
+	}
+	return SubQuery{
+		s:     s,
+		table: tab,
+		alias: alias,
+	}
 }
 
 func getHandler(ctx *Context, sess Session, c *core, entity any) *Result {

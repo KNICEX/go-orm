@@ -10,6 +10,7 @@ const (
 )
 
 type Model struct {
+	typ       reflect.Type
 	TableName string
 	// 字段名 -> 字段信息
 	FieldMap map[string]*Field

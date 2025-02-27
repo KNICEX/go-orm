@@ -477,3 +477,106 @@ func TestSelector_Count(t *testing.T) {
 	}
 
 }
+
+func TestSelector_SubQuery(t *testing.T) {
+	db := memoryDB(t)
+
+	type Order struct {
+		Id        int
+		UsingCol1 string
+		UsingCol2 string
+	}
+
+	type OrderDetail struct {
+		OrderId int
+		ItemId  int
+
+		UsingCol1 string
+		UsingCol2 string
+	}
+
+	type Item struct {
+		Id int
+	}
+
+	testCases := []struct {
+		name      string
+		s         func() SqlBuilder
+		wantQuery *Query
+		wantErr   error
+	}{
+		{
+			name: "sub query",
+			s: func() SqlBuilder {
+				sub := NewSelector[OrderDetail](db).AsSubQuery("sub")
+				return NewSelector[Order](db).Select(sub.Col("ItemId")).From(sub)
+			},
+			wantQuery: &Query{
+				SQL: "SELECT `sub`.`item_id` FROM (SELECT * FROM `order_detail`) AS `sub`;",
+			},
+		},
+		{
+			name: "sub query with alias",
+			s: func() SqlBuilder {
+				sub := NewSelector[OrderDetail](db).AsSubQuery("sub")
+				return NewSelector[Order](db).Select(sub.Col("ItemId").As("item_id")).From(sub)
+			},
+			wantQuery: &Query{
+				SQL: "SELECT `sub`.`item_id` AS `item_id` FROM (SELECT * FROM `order_detail`) AS `sub`;",
+			},
+		},
+		{
+			name: "sub specify columns",
+			s: func() SqlBuilder {
+				sub := NewSelector[OrderDetail](db).Select(Col("OrderId"), Col("ItemId")).AsSubQuery("sub")
+				return NewSelector[Order](db).Select(sub.Col("ItemId")).From(sub)
+			},
+			wantQuery: &Query{
+				SQL: "SELECT `sub`.`item_id` FROM (SELECT `order_id`,`item_id` FROM `order_detail`) AS `sub`;",
+			},
+		},
+		{
+			name: "sub query with join",
+			s: func() SqlBuilder {
+				sub := NewSelector[OrderDetail](db).AsSubQuery("sub")
+				return NewSelector[Order](db).Select(sub.Col("ItemId")).From(sub.Join(TableOf(&Item{})).On(sub.Col("ItemId").Eq(Col("Id"))))
+			},
+			wantQuery: &Query{
+				SQL: "SELECT `sub`.`item_id` FROM ((SELECT * FROM `order_detail`) AS `sub` INNER JOIN `item` ON `sub`.`item_id` = `id`);",
+			},
+		},
+		{
+			name: "sub join sub",
+			s: func() SqlBuilder {
+				sub1 := NewSelector[OrderDetail](db).AsSubQuery("sub1")
+				sub2 := NewSelector[Item](db).AsSubQuery("sub2")
+				return NewSelector[Order](db).Select(sub1.Col("ItemId")).From(sub1.LeftJoin(sub2).On(sub1.Col("ItemId").Eq(sub2.Col("Id"))))
+
+			},
+			wantQuery: &Query{
+				SQL: "SELECT `sub1`.`item_id` FROM ((SELECT * FROM `order_detail`) AS `sub1` LEFT JOIN (SELECT * FROM `item`) AS `sub2` ON `sub1`.`item_id` = `sub2`.`id`);",
+			},
+		},
+		{
+			name: "sub with aggregate",
+			s: func() SqlBuilder {
+				sub := NewSelector[OrderDetail](db).AsSubQuery("sub")
+				return NewSelector[Order](db).Select(sub.Col("OrderId"), sub.Min("ItemId").As("min_id")).From(sub).GroupBy(sub.Col("OrderId"))
+			},
+			wantQuery: &Query{
+				SQL: "SELECT `sub`.`order_id`,MIN(`sub`.`item_id`) AS `min_id` FROM (SELECT * FROM `order_detail`) AS `sub` GROUP BY `sub`.`order_id`;",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := tc.s().Build()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantQuery, q)
+		})
+	}
+}

@@ -3,6 +3,7 @@ package orm
 // Aggregate 聚合函数
 // AVG, COUNT, MAX, MIN, SUM
 type Aggregate struct {
+	table TableReference
 	fn    string
 	arg   string
 	alias string
@@ -10,10 +11,19 @@ type Aggregate struct {
 
 func (a Aggregate) expr() {}
 
-func (a Aggregate) selectable() {}
+func (a Aggregate) selectedAlias() string { return a.alias }
+
+func (a Aggregate) fieldName() string {
+	return a.arg
+}
+
+func (a Aggregate) target() TableReference {
+	return a.table
+}
 
 func (a Aggregate) As(alias string) Aggregate {
 	return Aggregate{
+		table: a.table,
 		fn:    a.fn,
 		arg:   a.arg,
 		alias: alias,
