@@ -116,7 +116,7 @@ func (b *builder) buildExpression(expr Expression) error {
 	case Column:
 		// 条件表达式不允许列别名
 		exp.alias = ""
-		return b.buildColumn(Column{name: exp.name})
+		return b.buildColumn(exp)
 	case value:
 		b.sb.WriteByte('?')
 		b.addArgs(exp.val)
@@ -138,18 +138,96 @@ func (b *builder) buildExpression(expr Expression) error {
 	return nil
 }
 
+func (b *builder) buildTable(table TableReference) error {
+	switch t := table.(type) {
+	case nil:
+		// 没有调用From
+		b.quote(b.model.TableName)
+	case Table:
+		m, err := b.r.Get(t.entity)
+		if err != nil {
+			return err
+		}
+		b.quote(m.TableName)
+		if t.alias != "" {
+			b.sb.WriteString(" AS ")
+			b.quote(t.alias)
+		}
+	case Join:
+		b.sb.WriteByte('(')
+		// left
+		if err := b.buildTable(t.left); err != nil {
+			return err
+		}
+		b.sb.WriteByte(' ')
+		b.sb.WriteString(t.typ)
+		b.sb.WriteByte(' ')
+		// right
+		if err := b.buildTable(t.right); err != nil {
+			return err
+		}
+		// using
+		if len(t.using) > 0 {
+			b.sb.WriteString(" USING (")
+			for _, col := range t.using {
+				if err := b.buildColumn(Column{name: col}); err != nil {
+					return err
+				}
+				if col != t.using[len(t.using)-1] {
+					b.sb.WriteByte(',')
+				}
+			}
+			b.sb.WriteByte(')')
+		}
+		// on
+		if len(t.on) > 0 {
+			b.sb.WriteString(" ON ")
+			if err := b.buildPredicate(t.on); err != nil {
+				return err
+			}
+		}
+		b.sb.WriteByte(')')
+	default:
+		return errs.NewErrUnsupportedTable(table)
+	}
+	return nil
+}
+
 // buildColumn 构造单个列
 func (b *builder) buildColumn(c Column) error {
-	fd, ok := b.model.FieldMap[c.name]
-	if !ok {
-		return errs.NewErrUnknownField(c.name)
+	switch table := c.table.(type) {
+	case nil:
+		fd, ok := b.model.FieldMap[c.name]
+		if !ok {
+			return errs.NewErrUnknownField(c.name)
+		}
+
+		b.quote(fd.ColName)
+
+	case Table:
+		m, err := b.r.Get(table.entity)
+		if err != nil {
+			return err
+		}
+		fd, ok := m.FieldMap[c.name]
+		if !ok {
+			return errs.NewErrUnknownField(c.name)
+		}
+		if table.alias != "" {
+			b.quote(table.alias)
+		} else {
+			b.quote(m.TableName)
+		}
+		b.sb.WriteByte('.')
+		b.quote(fd.ColName)
+
+	default:
+		return errs.NewErrUnsupportedTable(c.table)
 	}
-
-	b.quote(fd.ColName)
-
 	if c.alias != "" {
 		b.sb.WriteString(" AS ")
 		b.quote(c.alias)
 	}
 	return nil
+
 }

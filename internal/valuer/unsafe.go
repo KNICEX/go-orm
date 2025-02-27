@@ -35,7 +35,6 @@ func (u *unsafeValue) Field(name string) (any, error) {
 	}
 	fdPtr := unsafe.Pointer(uintptr(u.addr) + fd.Offset)
 	return reflect.NewAt(fd.Typ, fdPtr).Elem().Interface(), nil
-
 }
 
 func (u *unsafeValue) SetColumns(rows *sql.Rows) error {

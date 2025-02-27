@@ -16,6 +16,10 @@ func NewErrUnsupportedExpression(expr any) error {
 	return fmt.Errorf("orm: unsupported expression type %v", expr)
 }
 
+func NewErrUnsupportedTable(table any) error {
+	return fmt.Errorf("orm: unsupported TableReference type %v", table)
+}
+
 func NewErrUnknownField(name string) error {
 	return fmt.Errorf("orm: unknown field %s", name)
 }

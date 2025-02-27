@@ -6,6 +6,8 @@ const (
 )
 
 type Column struct {
+	table TableReference
+
 	name  string
 	alias string
 	desc  bool

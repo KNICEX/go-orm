@@ -16,6 +16,98 @@ type TestModel struct {
 	LastName  string
 }
 
+func TestSelector_Join(t *testing.T) {
+	db := memoryDB(t)
+	type Order struct {
+		Id        int
+		UsingCol1 string
+		UsingCol2 string
+	}
+
+	type OrderDetail struct {
+		OrderId   int
+		ItemId    int
+		UsingCol1 string
+		UsingCol2 string
+	}
+
+	type Item struct {
+		Id int
+	}
+	testCases := []struct {
+		name      string
+		s         func() SqlBuilder
+		wantQuery *Query
+		wantErr   error
+	}{
+		{
+			name: "specify table",
+			s: func() SqlBuilder {
+				return NewSelector[Order](db).From(TableOf(&OrderDetail{}))
+			},
+			wantQuery: &Query{
+				SQL: "SELECT * FROM `order_detail`;",
+			},
+		},
+		{
+			name: "join-using",
+			s: func() SqlBuilder {
+				return NewSelector[Order](db).From(TableOf(&Order{}).Join(TableOf(&OrderDetail{})).Using("UsingCol1", "UsingCol2"))
+			},
+			wantQuery: &Query{
+				SQL: "SELECT * FROM (`order` INNER JOIN `order_detail` USING (`using_col1`,`using_col2`));",
+			},
+		},
+		{
+			name: "join-on",
+			s: func() SqlBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				return NewSelector[Order](db).From(t1.Join(t2).On(t1.Col("Id").Eq(t2.Col("OrderId"))))
+			},
+			wantQuery: &Query{
+				SQL: "SELECT * FROM (`order` AS `t1` INNER JOIN `order_detail` AS `t2` ON `t1`.`id` = `t2`.`order_id`);",
+			},
+		},
+		{
+			name: "left join",
+			s: func() SqlBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				return NewSelector[Order](db).From(t1.LeftJoin(t2).On(t1.Col("Id").Eq(t2.Col("OrderId"))))
+			},
+			wantQuery: &Query{
+				SQL: "SELECT * FROM (`order` AS `t1` LEFT JOIN `order_detail` AS `t2` ON `t1`.`id` = `t2`.`order_id`);",
+			},
+		},
+		{
+			name: "join join",
+			s: func() SqlBuilder {
+				t1 := TableOf(&Order{}).As("t1")
+				t2 := TableOf(&OrderDetail{}).As("t2")
+				t3 := t1.Join(t2).On(t1.Col("Id").Eq(t2.Col("OrderId")))
+				t4 := TableOf(&Item{}).As("t4")
+				t5 := t3.Join(t4).On(t2.Col("ItemId").Eq(t4.Col("Id")))
+				return NewSelector[Order](db).From(t5)
+			},
+			wantQuery: &Query{
+				SQL: "SELECT * FROM ((`order` AS `t1` INNER JOIN `order_detail` AS `t2` ON `t1`.`id` = `t2`.`order_id`) INNER JOIN `item` AS `t4` ON `t2`.`item_id` = `t4`.`id`);",
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			q, err := tc.s().Build()
+			assert.Equal(t, tc.wantErr, err)
+			if err != nil {
+				return
+			}
+			assert.Equal(t, tc.wantQuery, q)
+		})
+	}
+}
+
 func TestSelector_Build(t *testing.T) {
 	db, err := OpenDB(nil, DBWithDialect(DialectMySQL))
 	require.NoError(t, err)
@@ -34,25 +126,25 @@ func TestSelector_Build(t *testing.T) {
 		},
 		{
 			name:    "from",
-			builder: NewSelector[TestModel](db).From("test"),
-			wantQuery: &Query{
-				SQL: "SELECT * FROM test;",
-			},
-		},
-		{
-			name:    "from empty",
-			builder: NewSelector[TestModel](db).From(""),
+			builder: NewSelector[TestModel](db).From(TableOf(&TestModel{})),
 			wantQuery: &Query{
 				SQL: "SELECT * FROM `test_model`;",
 			},
 		},
 		{
-			name:    "from table with db",
-			builder: NewSelector[TestModel](db).From("db.test"),
+			name:    "from empty",
+			builder: NewSelector[TestModel](db).From(nil),
 			wantQuery: &Query{
-				SQL: "SELECT * FROM db.test;",
+				SQL: "SELECT * FROM `test_model`;",
 			},
 		},
+		//{
+		//	name:    "from table with db",
+		//	builder: NewSelector[TestModel](db).From("db.test"),
+		//	wantQuery: &Query{
+		//		SQL: "SELECT * FROM db.test;",
+		//	},
+		//},
 		{
 			name:    "where",
 			builder: NewSelector[TestModel](db).Where(Col("Id").Eq(18)),

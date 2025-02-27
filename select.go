@@ -18,7 +18,7 @@ type OrderAble interface {
 }
 
 type Selector[T any] struct {
-	table    string
+	table    TableReference
 	where    []Predicate
 	columns  []Selectable
 	orderBys []OrderAble
@@ -62,11 +62,8 @@ func (s *Selector[T]) Build() (*Query, error) {
 
 	s.sb.WriteString(" FROM ")
 	// 表名 如果没有指定表名，则使用类型名
-	if s.table == "" {
-		s.quote(m.TableName)
-	} else {
-		// 自己指定表名，不会自动加反引号， 因为可能是 db.table 这种形式
-		s.sb.WriteString(s.table)
+	if err = s.buildTable(s.table); err != nil {
+		return nil, err
 	}
 
 	// 条件构造
@@ -152,7 +149,7 @@ func (s *Selector[T]) Select(cols ...Selectable) *Selector[T] {
 	return s
 }
 
-func (s *Selector[T]) From(table string) *Selector[T] {
+func (s *Selector[T]) From(table TableReference) *Selector[T] {
 	s.table = table
 	return s
 }
