@@ -25,7 +25,6 @@ type Dialect interface {
 	buildOffsetLimit(sb *builder, offset, limit int) error
 	DataTypeOf(typ reflect.Value) string
 	// TableExistSQL 生成的SQL查询的结果为表名，不存在则应该返回空集
-	TableExistSQL(tableName string) (string, []any)
 }
 
 type standardSQL struct {
@@ -52,10 +51,6 @@ func (s *standardSQL) buildOffsetLimit(b *builder, offset, limit int) error {
 }
 
 func (s *standardSQL) DataTypeOf(typ reflect.Value) string {
-	panic("not implemented")
-}
-
-func (s *standardSQL) TableExistSQL(tableName string) (string, []any) {
 	panic("not implemented")
 }
 

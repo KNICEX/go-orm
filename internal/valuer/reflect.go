@@ -76,6 +76,7 @@ func (r *reflectValue) setRow(row []string, scanner *sql.Rows, entity any) error
 		return err
 	}
 
+	// scan 之后再将值赋给结构体字段
 	tpValue := reflect.ValueOf(entity).Elem()
 	for i, c := range row {
 		fd, _ := r.model.ColMap[c]

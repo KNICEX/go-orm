@@ -66,6 +66,8 @@ func (u *unsafeValue) SetColumns(rows *sql.Rows) error {
 	}
 }
 
+// setRow
+// 直接扫描
 func (u *unsafeValue) setRow(row []string, scanner *sql.Rows, entity any) error {
 	vals := make([]any, 0, len(row))
 	addr := reflect.ValueOf(entity).UnsafePointer()
@@ -76,9 +78,10 @@ func (u *unsafeValue) setRow(row []string, scanner *sql.Rows, entity any) error 
 		}
 		// 字段地址
 		fdAddr := unsafe.Pointer(uintptr(addr) + fd.Offset)
-		// 指针类型
+		// 将结构体的字段地址转换为对应的类型的指针
 		val := reflect.NewAt(fd.Typ, fdAddr).Interface()
 		vals = append(vals, val)
 	}
+	// 直接扫描赋值到结构体字段
 	return scanner.Scan(vals...)
 }

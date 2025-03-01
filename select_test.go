@@ -567,6 +567,18 @@ func TestSelector_SubQuery(t *testing.T) {
 				SQL: "SELECT `sub`.`order_id`,MIN(`sub`.`item_id`) AS `min_id` FROM (SELECT * FROM `order_detail`) AS `sub` GROUP BY `sub`.`order_id`;",
 			},
 		},
+		{
+			name: "sub join group having aggregate",
+			s: func() SqlBuilder {
+				sub1 := NewSelector[OrderDetail](db).Select(Col("OrderId"), Col("ItemId")).AsSubQuery("sub1")
+				sub2 := NewSelector[Item](db).AsSubQuery("sub2")
+				return NewSelector[Order](db).From(sub1.Join(sub2).On(sub1.Col("ItemId").Eq(sub2.Col("Id")))).GroupBy(sub1.Col("OrderId")).Having(sub1.Min("ItemId").Gt(1))
+			},
+			wantQuery: &Query{
+				SQL:  "SELECT * FROM ((SELECT `order_id`,`item_id` FROM `order_detail`) AS `sub1` INNER JOIN (SELECT * FROM `item`) AS `sub2` ON `sub1`.`item_id` = `sub2`.`id`) GROUP BY `sub1`.`order_id` HAVING MIN(`sub1`.`item_id`) > ?;",
+				Args: []any{1},
+			},
+		},
 	}
 
 	for _, tc := range testCases {

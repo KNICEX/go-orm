@@ -3,14 +3,17 @@ package orm
 type op string
 
 const (
-	opEq  op = "="
-	opNot op = "NOT"
-	opAnd op = "AND"
-	opOr  op = "OR"
-	opGt  op = ">"
-	opLt  op = "<"
-	opGe  op = ">="
-	opLe  op = "<="
+	opEq    op = "="
+	opNot   op = "NOT"
+	opAnd   op = "AND"
+	opOr    op = "OR"
+	opGt    op = ">"
+	opLt    op = "<"
+	opGe    op = ">="
+	opLe    op = "<="
+	opLike  op = "LIKE"
+	opIn    op = "IN"
+	opNotIn op = "NOT IN"
 )
 
 func (o op) String() string {

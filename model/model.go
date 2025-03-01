@@ -17,7 +17,14 @@ type Model struct {
 	// 列名 -> 字段信息
 	ColMap map[string]*Field
 	Fields []*Field
+
+	// 分表键
+	Sks map[string]struct{}
+	Sf  ShardingFunc
 }
+
+// ShardingFunc 分表函数
+type ShardingFunc func(sk map[string]any) (database string, table string)
 
 type Option func(*Model) error
 

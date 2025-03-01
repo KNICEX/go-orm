@@ -98,6 +98,30 @@ func (c Column) Le(arg any) Predicate {
 	}
 }
 
+func (c Column) Like(arg any) Predicate {
+	return Predicate{
+		left:  c,
+		op:    opLike,
+		right: valueOf(arg),
+	}
+}
+
+func (c Column) In(args ...any) Predicate {
+	return Predicate{
+		left:  c,
+		op:    opIn,
+		right: valueOf(args),
+	}
+}
+
+func (c Column) NotIn(args ...any) Predicate {
+	return Predicate{
+		left:  c,
+		op:    opNotIn,
+		right: valueOf(args),
+	}
+}
+
 func (c Column) Asc() Column {
 	return Column{
 		name:  c.name,

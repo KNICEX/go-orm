@@ -5,17 +5,19 @@ import (
 	"github.com/KNICEX/go-orm/model"
 )
 
+type OpType = string
+
 const (
-	RAW    = "RAW"
-	SELECT = "SELECT"
-	INSERT = "INSERT"
-	UPDATE = "UPDATE"
-	DELETE = "DELETE"
+	RAW    OpType = "RAW"
+	SELECT OpType = "SELECT"
+	INSERT OpType = "INSERT"
+	UPDATE OpType = "UPDATE"
+	DELETE OpType = "DELETE"
 )
 
 type Context struct {
 	// 操作类型 INSERT, UPDATE, DELETE, SELECT
-	Type string
+	Type OpType
 
 	Query *Query
 

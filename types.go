@@ -20,6 +20,7 @@ type SqlBuilder interface {
 }
 
 type Query struct {
-	SQL  string
-	Args []any
+	SQL      string
+	Database string
+	Args     []any
 }
